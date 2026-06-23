@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lesson 0001｜魔方入门：符号与首个可复现动作</title>
+  <link rel="stylesheet" href="../assets/style.css" />
+  <link rel="stylesheet" href="../assets/interactions.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Lesson 0001：符号 + 首个可复现动作（20 分钟）</h1>
+    <p class="badge">对应 Mission：先独立还原 3x3（从 0 到 1）</p>
+
+    <section class="card">
+      <h2>本课成果（学完你能做到）</h2>
+      <ul class="checklist">
+        <li>看懂并执行：<span class="mono">R / R' / R2 / U / U' / U2</span></li>
+        <li>稳定做出右手四连招：<span class="mono">R U R' U'</span></li>
+        <li>完成一个“可量化”训练闭环（至少 20 次正确重复）</li>
+      </ul>
+      <p class="tip">为什么先学这个：后面几乎每步都在复用这个动作模式。先把基础动作做顺，你会少掉很多“明明会公式却还原失败”的挫败。</p>
+    </section>
+
+    <section class="card">
+      <h2>1) 极简知识：怎么读符号</h2>
+      <div class="kv">
+        <div>字母</div><div>哪个面要转（R右 U上 F前 L左 D下 B后）</div>
+        <div>无符号</div><div>顺时针 90°（从该面正对你看）</div>
+        <div>'</div><div>逆时针 90°</div>
+        <div>2</div><div>180°</div>
+      </div>
+      <p class="warn">最常见错法：把顺逆按“自己正面”看。正确做法是：<strong>每次都把要转的那一面当观察面</strong>。</p>
+    </section>
+
+    <section class="card">
+      <h2>2) 本课唯一动作</h2>
+      <h3>右手四连招</h3>
+      <pre>R U R' U'</pre>
+      <p>口令（可选）：<span class="mono">右上右回上回</span>。先慢速 5 次，再连续 20 次。</p>
+
+      <div class="card" data-widget="rep-counter" data-target="20">
+        <h3>训练计数器（点击 +1）</h3>
+        <div class="rep-counter">
+          <button class="counter-btn" data-action="plus">+1 完成一次</button>
+          <button class="counter-btn" data-action="reset">重置</button>
+          <span class="counter-value">0</span>
+          <span class="counter-target">目标：20</span>
+          <div class="counter-status"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3) 2 分钟检索练习（retrieval practice）</h2>
+      <p>不要看上面的表，直接选答案：</p>
+
+      <div class="card" data-quiz="single-choice" data-answer="C">
+        <p><strong>Q1.</strong> <span class="mono">R'</span> 是什么？</p>
+        <div class="quiz-grid">
+          <button class="quiz-option" data-value="A">右面顺转</button>
+          <button class="quiz-option" data-value="B">上面逆转</button>
+          <button class="quiz-option" data-value="C">右面逆转</button>
+        </div>
+        <div class="quiz-feedback"></div>
+      </div>
+
+      <div class="card" data-quiz="single-choice" data-answer="B">
+        <p><strong>Q2.</strong> <span class="mono">U2</span> 是什么？</p>
+        <div class="quiz-grid">
+          <button class="quiz-option" data-value="A">上面逆转</button>
+          <button class="quiz-option" data-value="B">上面半转</button>
+          <button class="quiz-option" data-value="C">右面半转</button>
+        </div>
+        <div class="quiz-feedback"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4) 今天 30 分钟怎么练</h2>
+      <ol>
+        <li>5 分钟：只看符号，不转，口头读出 10 个随机符号（例如 R U' R2 U）。</li>
+        <li>15 分钟：四连招 <span class="mono">R U R' U'</span>，每组 20 次，做 2 组。</li>
+        <li>10 分钟：做完后打乱再复现四连招，确保方向不混。</li>
+      </ol>
+      <p>完成标准：你能不看提示，连续正确做 20 次四连招。</p>
+    </section>
+
+    <section class="card">
+      <h2>下一课预告</h2>
+      <p>Lesson 0002 将进入“白十字”目标：从任意打乱状态做出白色十字并与侧面中心对齐。</p>
+      <p>开练前可打印：<a href="../reference/0001-notation-and-core-drill.html">速查表 0001（符号与手法）</a></p>
+    </section>
+
+    <section class="card">
+      <h2>主要参考来源（高信任）</h2>
+      <ul>
+        <li><a href="https://www.jperm.net/3x3">J Perm — How To Solve The 3x3 Rubik's Cube</a></li>
+        <li><a href="https://ruwix.com/the-rubiks-cube/how-to-solve-the-rubiks-cube-beginners-method">Ruwix — Beginner's Method</a></li>
+        <li><a href="https://ruwix.com/the-rubiks-cube/notation">Ruwix — Rubik's Cube Notation</a></li>
+      </ul>
+    </section>
+
+    <p class="footer">有任何卡住点（例如“顺逆总混”、“做完更乱”），直接问我。我会按你的错误类型给你下一版更短、更有针对性的练习。</p>
+  </main>
+  <script src="../assets/interactions.js"></script>
+</body>
+</html>
