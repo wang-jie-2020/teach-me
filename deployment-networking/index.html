@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>部署网络处理手段课程索引</title>
+  <link rel="stylesheet" href="assets/course.css" />
+</head>
+<body>
+<main>
+  <header class="lesson-header">
+    <div class="kicker">Course Index</div>
+    <h1>部署网络处理手段</h1>
+    <p class="lede">从流量形状出发，系统学习反向代理、正向代理、SSH Tunnel、内网穿透、VPN/Overlay 和排障路径。</p>
+  </header>
+
+  <section class="note good">
+    <h2>学习顺序</h2>
+    <p>建议按编号学习。每节课都很短，重点是建立一个可复用的判断动作。</p>
+  </section>
+
+  <section>
+    <h2>课程</h2>
+    <div class="grid">
+      <article class="card">
+        <h3><a href="lessons/0001-choose-the-network-shape.html">0001 · 先判断流量形状，再选网络工具</a></h3>
+        <p>建立总地图：谁访问谁、谁能主动连接、该选哪类工具。</p>
+        <p><span class="tag">总览</span><span class="tag">选型</span></p>
+      </article>
+      <article class="card">
+        <h3><a href="lessons/0002-reverse-proxy-tls-termination.html">0002 · 反向代理、TLS 终止与真实客户端信息</a></h3>
+        <p>理解公网入口、TLS 终止、后端监听地址和 <code>X-Forwarded-*</code>。</p>
+        <p><span class="tag">反向代理</span><span class="tag">TLS</span></p>
+      </article>
+      <article class="card">
+        <h3><a href="lessons/0003-forward-proxy-connect-socks5.html">0003 · 正向代理、HTTP CONNECT 与 SOCKS5</a></h3>
+        <p>理解出口代理、CONNECT 隧道、SOCKS5 和 DNS 在哪里解析。</p>
+        <p><span class="tag">正向代理</span><span class="tag">SOCKS5</span></p>
+      </article>
+      <article class="card">
+        <h3><a href="lessons/0004-ssh-tunnel-l-r-d.html">0004 · SSH Tunnel：-L、-R、-D 与跳板机</a></h3>
+        <p>用“监听端口在哪里”区分本地转发、远程转发和动态转发。</p>
+        <p><span class="tag">SSH</span><span class="tag">Tunnel</span></p>
+      </article>
+      <article class="card">
+        <h3><a href="lessons/0005-intranet-tunnel-and-relay.html">0005 · 内网穿透：没有公网 IP 时如何暴露服务</a></h3>
+        <p>理解 <code>Origin → Relay ← User</code>，以及 tunnel 不是自动安全。</p>
+        <p><span class="tag">内网穿透</span><span class="tag">Relay</span></p>
+      </article>
+      <article class="card">
+        <h3><a href="lessons/0006-vpn-overlay-subnet-router.html">0006 · VPN / Overlay / Subnet Router</a></h3>
+        <p>区分暴露单个服务和建立受控私网；理解 peer、路由、ACL、subnet router。</p>
+        <p><span class="tag">VPN</span><span class="tag">Overlay</span></p>
+      </article>
+      <article class="card">
+        <h3><a href="lessons/0007-troubleshooting-dns-tcp-tls-http.html">0007 · 部署网络排障：DNS → TCP → TLS → HTTP → 代理 → 应用</a></h3>
+        <p>按层定位问题，不盲改配置；用 <code>dig</code>、<code>curl -v</code>、<code>ss</code>、<code>tcpdump</code>。</p>
+        <p><span class="tag">排障</span><span class="tag">工具链</span></p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>速查资料</h2>
+    <ul>
+      <li><a href="reference/0001-deployment-networking-map.html">0001 · 部署网络手段速查图</a></li>
+      <li><a href="reference/0002-command-cheatsheet.html">0002 · 部署网络命令速查</a></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>下一批建议</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>Docker / Kubernetes 网络</h3>
+        <p>端口发布、bridge、Service、Ingress、LoadBalancer、Gateway。</p>
+      </article>
+      <article class="card">
+        <h3>CDN / Cloudflare / 边缘网络</h3>
+        <p>DNS 托管、缓存、源站保护、边缘 TLS、回源。</p>
+      </article>
+      <article class="card">
+        <h3>零信任访问控制</h3>
+        <p>Identity-aware proxy、设备姿态、ACL、mTLS、应用身份边界。</p>
+      </article>
+      <article class="card">
+        <h3>真实案例排障</h3>
+        <p>502、证书错、Docker 端口不可达、Cloudflare 522/525、内网 DNS。</p>
+      </article>
+    </div>
+  </section>
+
+  <footer>
+    <p>学习建议：每节课看完后，用自己的一个真实服务场景画出路径图：客户端、DNS、代理、隧道、服务、TLS 终止点、认证点。</p>
+  </footer>
+</main>
+</body>
+</html>

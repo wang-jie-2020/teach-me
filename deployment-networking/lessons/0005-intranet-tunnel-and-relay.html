@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>0005 · 内网穿透：没有公网 IP 时如何暴露服务</title>
+  <link rel="stylesheet" href="../assets/course.css" />
+</head>
+<body>
+<main>
+  <header class="lesson-header">
+    <div class="kicker">Lesson 0005 · Tunneling</div>
+    <h1>内网穿透：没有公网 IP 时如何暴露服务</h1>
+    <p class="lede">本课练一个判断：当源站不能被公网主动连接时，就让源站主动连出去，建立一条可反向承载流量的通道。</p>
+  </header>
+
+  <section class="note good">
+    <h2>这一课的胜利标准</h2>
+    <p>你能画出 <code>Origin → Relay ← User</code>，并知道它和反向代理、SSH <code>-R</code>、VPN 的区别。</p>
+  </section>
+
+  <section>
+    <h2>为什么需要内网穿透</h2>
+    <p>很多服务位于 NAT、防火墙、家宽、公司内网后面：公网用户无法直接向它发起连接。内网穿透的思路是反过来：内网机器运行一个 agent，主动向公网 relay 建立出站连接；用户访问 relay，relay 再把流量送回内网 agent。</p>
+    <div class="diagram">Home / Office Origin
+  │ outbound-only connection
+  ▼
+Public Relay / Edge
+  ▲
+  │ user request
+User</div>
+    <p>Cloudflare Tunnel 官方文档明确描述了这种 outbound-only 模型：<code>cloudflared</code> 从源站主动连到 Cloudflare 网络，源站不需要公网可路由 IP。</p>
+  </section>
+
+  <section>
+    <h2>三种常见实现</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>SSH <code>-R</code></h3>
+        <p><span class="tag">临时</span><span class="tag">小范围</span></p>
+        <pre><code>ssh -N -R 127.0.0.1:18080:127.0.0.1:8080 user@public-server</code></pre>
+        <p>远端服务器监听端口，流量通过 SSH 回到本地服务。</p>
+      </article>
+      <article class="card">
+        <h3>frp / ngrok 类</h3>
+        <p><span class="tag">自建 relay</span><span class="tag">多协议</span></p>
+        <p>内网跑 client，公网跑 server。适合自建穿透、映射 TCP/HTTP 服务。</p>
+      </article>
+      <article class="card">
+        <h3>Cloudflare Tunnel</h3>
+        <p><span class="tag">托管边缘</span><span class="tag">身份策略</span></p>
+        <p>源站跑 <code>cloudflared</code>，通过 Cloudflare 边缘暴露 HTTP、SSH 等资源，可叠加 Access 身份策略。</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>它和反向代理的关系</h2>
+    <p>很多内网穿透产品的公网侧仍然表现得像反向代理：用户访问域名，边缘节点转发到后端。区别在于后端连接方向：</p>
+    <div class="grid">
+      <article class="card">
+        <h3>普通反向代理</h3>
+        <div class="diagram">Proxy → Origin</div>
+        <p>代理能主动连到源站。源站通常有公网 IP、内网路由或防火墙放行。</p>
+      </article>
+      <article class="card">
+        <h3>内网穿透</h3>
+        <div class="diagram">Origin → Relay</div>
+        <p>源站主动连 relay。relay 不需要能直接拨入源站。</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="note warning">
+    <h2>安全边界</h2>
+    <ul>
+      <li>穿透不是“自动安全”。它只是改变连接方向，服务仍然可能暴露给公网。</li>
+      <li>优先叠加身份认证：Access、Basic Auth、OIDC、mTLS、应用登录，不要只靠“隐藏 URL”。</li>
+      <li>限制暴露范围：只映射必要端口和路径；管理后台不要默认暴露给所有人。</li>
+      <li>确认源站是否还能被其他路径直连。如果能，需要防火墙或安全组封住绕过路径。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>选型判断</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>场景</th><th>优先考虑</th><th>原因</th></tr></thead>
+        <tbody>
+          <tr><td>临时演示本机服务</td><td>SSH -R / ngrok</td><td>快，用完关</td></tr>
+          <tr><td>家中 NAS 长期访问</td><td>Cloudflare Tunnel / Tailscale</td><td>少开入站端口，可加身份控制</td></tr>
+          <tr><td>自有 VPS + 多内网服务</td><td>frp</td><td>自控 relay，多协议映射</td></tr>
+          <tr><td>团队访问多个内网网段</td><td>Overlay/VPN</td><td>不是暴露单个服务，而是建立受控私网互访</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>练习</h2>
+    <article class="quiz" data-answer="outbound" data-ok="正确：内网穿透的关键是源站主动向公网 relay 建立出站连接。" data-no="再想想：源站没有公网入站能力，所以只能主动连出去。">
+      <h3>场景 1</h3>
+      <p>家宽 NAT 后的服务要被公网访问，内网穿透最关键的连接方向是什么？</p>
+      <label class="quiz-option"><input type="radio" name="q1" value="inbound">公网直接拨入源站</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="outbound">源站主动连 relay</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="dnsonly">只靠 DNS 解析</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="cacheit">只靠浏览器缓存</label>
+      <button data-check-quiz>检查答案</button>
+    </article>
+
+    <article class="quiz" data-answer="auth" data-ok="正确：穿透后仍要做认证和授权，尤其是管理后台。" data-no="再想想：连接通了不等于访问安全。">
+      <h3>场景 2</h3>
+      <p>把家里 NAS 管理页通过 tunnel 暴露到域名后，下一步最应该补什么？</p>
+      <label class="quiz-option"><input type="radio" name="q2" value="auth">身份访问控制</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="larger">更大带宽套餐</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="random">随机换端口号</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="noneed">不需要处理</label>
+      <button data-check-quiz>检查答案</button>
+    </article>
+  </section>
+
+  <section>
+    <h2>推荐主源</h2>
+    <p><a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/">Cloudflare Tunnel</a> 的官方说明最清楚地展示了 outbound-only 连接模型。自建路线看 <a href="https://gofrp.org/en/docs/">frp Documentation</a>。</p>
+  </section>
+
+  <footer>
+    <p>下一课：VPN / Overlay / Subnet Router —— 当你不是暴露单个服务，而是要建立一张受控私网。</p>
+  </footer>
+</main>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

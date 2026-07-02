@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>0006 · VPN / Overlay / Subnet Router</title>
+  <link rel="stylesheet" href="../assets/course.css" />
+</head>
+<body>
+<main>
+  <header class="lesson-header">
+    <div class="kicker">Lesson 0006 · Overlay Network</div>
+    <h1>VPN / Overlay / Subnet Router</h1>
+    <p class="lede">本课练一个判断：什么时候该暴露“一个服务”，什么时候该建立“一张受控私网”。</p>
+  </header>
+
+  <section class="note good">
+    <h2>这一课的胜利标准</h2>
+    <p>你能解释 WireGuard/Tailscale 这类 Overlay 解决的不是 HTTP 入口，而是“节点之间如何带身份、带路由地互访”。</p>
+  </section>
+
+  <section>
+    <h2>Overlay 的形状</h2>
+    <div class="diagram">Laptop 100.x.y.1
+   │
+   ├── encrypted overlay network + ACL
+   │
+Server 100.x.y.2 ── Subnet Router ── 10.0.0.0/24</div>
+    <p>反向代理和内网穿透通常暴露某个服务；Overlay/VPN 更像给设备建立一张虚拟网。加入这张网的节点获得虚拟 IP，再通过路由和 ACL 互访。</p>
+  </section>
+
+  <section>
+    <h2>三个概念</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>Peer</h3>
+        <p>加入虚拟网络的设备或节点。WireGuard 里 peer 由公钥识别；Tailscale 在此之上加了身份和控制面。</p>
+      </article>
+      <article class="card">
+        <h3>Allowed IPs / 路由</h3>
+        <p>决定哪些目标网段走隧道。它既是路由选择，也常是访问范围声明。</p>
+      </article>
+      <article class="card">
+        <h3>Subnet Router</h3>
+        <p>一个已加入 Overlay 的设备替传统子网发布路由，让没安装客户端的内网设备也能被访问。</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>什么时候选 Overlay</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>需求</th><th>反代/穿透</th><th>Overlay/VPN</th></tr></thead>
+        <tbody>
+          <tr><td>公网用户访问一个网站</td><td>合适</td><td>通常不合适</td></tr>
+          <tr><td>员工访问多个内部系统</td><td>会变成很多入口</td><td>合适</td></tr>
+          <tr><td>跨云服务器互访数据库、缓存、管理口</td><td>不够自然</td><td>合适</td></tr>
+          <tr><td>临时给客户演示一个页面</td><td>合适</td><td>过重</td></tr>
+          <tr><td>访问整个办公室网段</td><td>不合适</td><td>Subnet Router 合适</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Subnet Router 的直觉</h2>
+    <p>假设办公室有一段传统内网 <code>192.168.10.0/24</code>，打印机、NAS、旧系统都不能装 Tailscale。你可以让一台 Linux 小主机加入 tailnet，并“广告”这段路由：</p>
+    <div class="diagram">Your Laptop ── Tailnet ── Linux Router ── 192.168.10.0/24</div>
+    <p>Tailscale 官方文档把 subnet router 描述为 tailnet 中的网关，用来向其他设备发布传统子网路由。默认可能做 SNAT；如果要保留源 IP，需要理解并配置相关选项。</p>
+  </section>
+
+  <section class="note warning">
+    <h2>安全边界</h2>
+    <ul>
+      <li>Overlay 不是“全员全网互通”。必须用 ACL 限制谁能访问哪些主机/端口。</li>
+      <li>Subnet Router 会把一个传统网段带进虚拟网络，范围要尽量小。</li>
+      <li>注意 SNAT：保留源 IP 有利于审计，但需要回程路由正确；SNAT 简单但会让后端只看到路由器 IP。</li>
+      <li>设备信任很重要：丢失的笔记本可能仍拥有内网路径，需能快速撤销。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>练习</h2>
+    <article class="quiz" data-answer="overlay" data-ok="正确：多个内部系统、长期访问、设备身份控制，Overlay/VPN 更自然。" data-no="再想想：不是暴露单个 Web 服务，而是长期访问多资源。">
+      <h3>场景 1</h3>
+      <p>团队成员需要长期访问办公室里的 NAS、GitLab、监控系统和几台服务器，优先考虑什么？</p>
+      <label class="quiz-option"><input type="radio" name="q1" value="cdn">CDN</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="overlay">Overlay/VPN</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="random">随机端口</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="cache">浏览器缓存</label>
+      <button data-check-quiz>检查答案</button>
+    </article>
+
+    <article class="quiz" data-answer="subnet" data-ok="正确：不能安装客户端的传统网段，可以通过 subnet router 被受控接入。" data-no="再想想：设备不能装客户端，但有一台网关能代表网段发布路由。">
+      <h3>场景 2</h3>
+      <p>一批旧设备不能安装 VPN 客户端，但你想从 tailnet 访问它们所在网段。该用什么角色？</p>
+      <label class="quiz-option"><input type="radio" name="q2" value="subnet">Subnet Router</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="browser">浏览器插件</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="reverse">普通反代</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="headers">请求头转发</label>
+      <button data-check-quiz>检查答案</button>
+    </article>
+  </section>
+
+  <section>
+    <h2>推荐主源</h2>
+    <p>读 <a href="https://tailscale.com/kb/1019/subnets">Tailscale Subnet routers</a> 建立 subnet router 模型；读 <a href="https://www.wireguard.com/quickstart/">WireGuard Quick Start</a> 看接口、peer、allowed-ips、endpoint 的底层形状。</p>
+  </section>
+
+  <footer>
+    <p>下一课：排障路线。工具很多，但顺序固定：DNS → TCP → TLS → HTTP → 代理 → 应用。</p>
+  </footer>
+</main>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

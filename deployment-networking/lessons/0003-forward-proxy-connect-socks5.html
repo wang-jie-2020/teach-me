@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>0003 · 正向代理、HTTP CONNECT 与 SOCKS5</title>
+  <link rel="stylesheet" href="../assets/course.css" />
+</head>
+<body>
+<main>
+  <header class="lesson-header">
+    <div class="kicker">Lesson 0003 · Forward Proxy</div>
+    <h1>正向代理、HTTP CONNECT 与 SOCKS5</h1>
+    <p class="lede">本课练一个判断：代理到底是在帮“客户端出网”，还是在帮“服务端接客”。正向代理解决的是出口控制，不是入口暴露。</p>
+  </header>
+
+  <section class="note good">
+    <h2>这一课的胜利标准</h2>
+    <p>你能区分 HTTP 正向代理、HTTP CONNECT 隧道、SOCKS5；并能用 <code>curl</code> 验证请求是否真的走了代理。</p>
+  </section>
+
+  <section>
+    <h2>正向代理的形状</h2>
+    <div class="diagram">Client / App
+  │  request to proxy
+  ▼
+Forward Proxy / Egress Gateway
+  │  request to target
+  ▼
+Internet target</div>
+    <p>正向代理代表客户端访问目标站点。企业常用它做统一出口、访问控制、审计、缓存、下载加速、合规拦截。它回答的问题是：“谁可以从内网访问外部哪里？”</p>
+  </section>
+
+  <section>
+    <h2>三种常见出口形态</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>HTTP 正向代理</h3>
+        <p><span class="tag">HTTP</span><span class="tag">可看见请求</span></p>
+        <div class="diagram">curl → proxy → http://target</div>
+        <p>客户端把完整目标 URL 发给代理，代理代为请求。适合 HTTP 流量。</p>
+      </article>
+      <article class="card">
+        <h3>HTTP CONNECT</h3>
+        <p><span class="tag">HTTPS</span><span class="tag">隧道</span></p>
+        <div class="diagram">client → CONNECT host:443 → proxy ⇄ target</div>
+        <p>代理先建立到目标的 TCP 隧道，之后盲转发字节流，常用于通过代理访问 HTTPS。</p>
+      </article>
+      <article class="card">
+        <h3>SOCKS5</h3>
+        <p><span class="tag">通用 TCP</span><span class="tag">应用指定目标</span></p>
+        <div class="diagram">app → socks5://proxy → target</div>
+        <p>比 HTTP 代理更通用。SSH <code>-D</code> 会在本机开一个 SOCKS4/5 代理。</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>DNS 在哪里解析？</h2>
+    <p>这点很容易踩坑：使用 SOCKS 时，域名可以在本机解析，也可以交给代理端解析。</p>
+    <pre><code># socks5：通常本机先解析目标域名，再把 IP 给代理
+curl -v --proxy socks5://127.0.0.1:1080 https://example.com/
+
+# socks5h：把 hostname 交给 SOCKS 代理端解析
+curl -v --proxy socks5h://127.0.0.1:1080 https://example.com/</code></pre>
+    <p>如果目标域名只在远端内网 DNS 可解析，常需要 <code>socks5h</code>。</p>
+  </section>
+
+  <section>
+    <h2>验证请求走代理</h2>
+    <pre><code># HTTP/HTTPS 经 HTTP 代理
+curl -v -x http://proxy.example.com:3128 https://example.com/
+
+# 本机 SSH 动态转发开 SOCKS5
+ssh -D 127.0.0.1:1080 user@jump-host
+curl -v --proxy socks5h://127.0.0.1:1080 https://example.com/
+
+# 查看 curl 输出中的关键线索：
+# * Uses proxy env variable ...
+# * Trying 127.0.0.1:1080...
+# * CONNECT tunnel established</code></pre>
+  </section>
+
+  <section class="note warning">
+    <h2>安全边界</h2>
+    <ul>
+      <li>不要开放一个“任意人可用”的出口代理，它会变成匿名跳板。</li>
+      <li>支持 CONNECT 的代理应限制目标端口和目标范围。RFC 9110 明确提醒，任意 CONNECT 到保留端口可能被滥用。</li>
+      <li>出口代理能记录元数据，甚至在 TLS 检查场景中解密流量；要有明确的授权和告知。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>练习</h2>
+    <article class="quiz" data-answer="forward" data-ok="正确：这是服务从内网受控访问外部 API，正向代理/出口网关是入口。" data-no="再想想：不是公网用户访问你的服务，而是你的服务访问外部。">
+      <h3>场景 1</h3>
+      <p>公司要求所有后端服务访问公网 API 都必须经过统一出口，并记录访问日志。选哪类方案？</p>
+      <label class="quiz-option"><input type="radio" name="q1" value="reverse">反向代理</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="forward">正向代理</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="ingress">Ingress</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="cdnonly">CDN 缓存</label>
+      <button data-check-quiz>检查答案</button>
+    </article>
+
+    <article class="quiz" data-answer="socks5h" data-ok="正确：socks5h 把 hostname 交给代理端解析，适合本地解析不到的内网域名。" data-no="再想想：关键限制是目标域名只有远端网络能解析。">
+      <h3>场景 2</h3>
+      <p>你通过 SSH <code>-D</code> 访问远端内网网站 <code>admin.internal</code>，本机 DNS 解析不到。curl 该优先用什么？</p>
+      <label class="quiz-option"><input type="radio" name="q2" value="httpx">http://proxy</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="socks5">socks5://</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="socks5h">socks5h://</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="resolve">--resolve</label>
+      <button data-check-quiz>检查答案</button>
+    </article>
+  </section>
+
+  <section>
+    <h2>推荐主源</h2>
+    <p>读 <a href="https://everything.curl.dev/usingcurl/proxies">everything curl: Proxies</a> 学会如何从客户端验证代理；读 <a href="https://www.rfc-editor.org/rfc/rfc9110#name-connect">RFC 9110 CONNECT</a> 理解 HTTP CONNECT 的隧道边界。</p>
+  </section>
+
+  <footer>
+    <p>下一课：SSH Tunnel，把 <code>-L</code>、<code>-R</code>、<code>-D</code> 放进同一张图里。</p>
+  </footer>
+</main>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>0002 · 反向代理、TLS 终止与真实客户端信息</title>
+  <link rel="stylesheet" href="../assets/course.css" />
+</head>
+<body>
+<main>
+  <header class="lesson-header">
+    <div class="kicker">Lesson 0002 · Reverse Proxy</div>
+    <h1>反向代理、TLS 终止与真实客户端信息</h1>
+    <p class="lede">本课练一个部署动作：把公网 HTTPS 入口放在代理上，后端应用只监听本机或内网，并把必要的客户端信息传给后端。</p>
+  </header>
+
+  <section class="note good">
+    <h2>这一课的胜利标准</h2>
+    <p>你能解释 <code>User → HTTPS → Proxy → App</code> 里 TLS 在哪里结束、后端为什么需要 <code>X-Forwarded-*</code> 头，以及为什么后端服务不该裸露公网。</p>
+    <p class="small">配套速查：<a href="../reference/0002-command-cheatsheet.html">部署网络命令速查</a></p>
+  </section>
+
+  <section>
+    <h2>反向代理的最小路径</h2>
+    <div class="diagram">Browser
+  │  HTTPS :443
+  ▼
+Caddy / Nginx / HAProxy
+  │  HTTP :3000 or HTTPS :3000
+  ▼
+App process</div>
+    <p>反向代理站在服务端前面。用户以为自己访问的是应用，实际上先到代理；代理再请求后端应用。NGINX 官方文档把这个过程描述为：代理接收请求、发送给上游、取回响应、再返回给客户端。</p>
+  </section>
+
+  <section>
+    <h2>TLS 终止在哪里？</h2>
+    <div class="grid">
+      <article class="card">
+        <h3>代理终止 TLS</h3>
+        <div class="diagram">User ==HTTPS==> Proxy --HTTP--> App</div>
+        <p>最常见。证书在代理上，后端应用可以只跑 HTTP。适合单机或可信内网。</p>
+      </article>
+      <article class="card">
+        <h3>端到端 TLS</h3>
+        <div class="diagram">User ==HTTPS==> Proxy ==HTTPS==> App</div>
+        <p>后端也启 TLS。适合跨不可信网络、合规要求高、零信任环境。</p>
+      </article>
+    </div>
+    <p>“TLS 终止”不是坏事。关键是终止后到后端的那段网络是否可信，以及认证/授权是否仍然完整。</p>
+  </section>
+
+  <section>
+    <h2>配置骨架</h2>
+    <h3>Caddy：最小 HTTPS 反代</h3>
+    <pre><code>app.example.com {
+  reverse_proxy 127.0.0.1:3000
+}</code></pre>
+    <p>Caddy 知道域名后会默认自动启用 HTTPS、签发/续期证书，并把 HTTP 重定向到 HTTPS。</p>
+
+    <h3>Nginx：保留真实请求信息</h3>
+    <pre><code>location / {
+  proxy_pass http://127.0.0.1:3000;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}</code></pre>
+    <p>后端看到的直接来源通常是代理 IP，不是用户 IP。应用如果要生成绝对 URL、记录客户端 IP、判断是否 HTTPS，通常要读取这些代理头，并且只信任来自可信代理的头。</p>
+  </section>
+
+  <section>
+    <h2>部署时的三个边界</h2>
+    <div class="grid">
+      <article class="card warning">
+        <h3>后端监听地址</h3>
+        <p>单机部署时优先让应用监听 <code>127.0.0.1:3000</code>，只让代理暴露公网。</p>
+      </article>
+      <article class="card warning">
+        <h3>源站绕过</h3>
+        <p>如果后端端口公网可达，攻击者可以绕过代理层的 TLS、限流、WAF 或认证。</p>
+      </article>
+      <article class="card warning">
+        <h3>代理头信任</h3>
+        <p><code>X-Forwarded-For</code> 可被客户端伪造。应用只能信任由可信反代追加/覆盖后的值。</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>快速验证</h2>
+    <pre><code># 看 TLS、连接 IP、请求/响应头
+curl -v https://app.example.com/
+
+# 绕过 DNS 指向某台新机器，但保持 Host/SNI
+curl -v --resolve app.example.com:443:203.0.113.10 https://app.example.com/
+
+# 在服务器上确认后端只监听本机
+ss -ltnp 'sport = :3000'</code></pre>
+  </section>
+
+  <section>
+    <h2>练习</h2>
+    <article class="quiz" data-answer="loopback" data-ok="正确：后端只给本机代理访问，公网入口交给反向代理。" data-no="再想想：反向代理的目标之一是让后端不要直接裸露公网。">
+      <h3>场景</h3>
+      <p>单机部署一个 API，Caddy 负责公网 HTTPS，Node.js 后端应该优先监听哪里？</p>
+      <label class="quiz-option"><input type="radio" name="q1" value="public">0.0.0.0:3000</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="loopback">127.0.0.1:3000</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="random">随机高端口</label>
+      <label class="quiz-option"><input type="radio" name="q1" value="dnsonly">只配 DNS</label>
+      <button data-check-quiz>检查答案</button>
+    </article>
+
+    <article class="quiz" data-answer="proto" data-ok="正确：后端要知道用户原始请求是否 HTTPS，常看 X-Forwarded-Proto。" data-no="再想想：后端与代理之间可能是 HTTP，但用户到代理是 HTTPS。">
+      <h3>场景</h3>
+      <p>后端生成回调 URL 时总生成 <code>http://</code>，但用户访问入口是 HTTPS。优先检查哪个代理头？</p>
+      <label class="quiz-option"><input type="radio" name="q2" value="host">Host</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="proto">X-Forwarded-Proto</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="agent">User-Agent</label>
+      <label class="quiz-option"><input type="radio" name="q2" value="accept">Accept</label>
+      <button data-check-quiz>检查答案</button>
+    </article>
+  </section>
+
+  <section>
+    <h2>推荐主源</h2>
+    <p><a href="https://caddyserver.com/docs/quick-starts/reverse-proxy">Caddy Reverse proxy quick-start</a>：最适合快速把 HTTPS 反代跑起来。深入 Nginx 时读 <a href="https://docs.nginx.com/nginx/admin-guide/web-server/reverse-proxy/">NGINX Reverse Proxy</a>。</p>
+  </section>
+
+  <footer>
+    <p>下一课：正向代理、HTTP CONNECT 与 SOCKS5 —— 代理站在客户端侧时，问题会完全不同。</p>
+  </footer>
+</main>
+<script src="../assets/quiz.js"></script>
+</body>
+</html>
