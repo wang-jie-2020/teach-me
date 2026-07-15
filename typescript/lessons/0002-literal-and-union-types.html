@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>0002 · 字面量类型、联合类型与类型别名</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<link rel="stylesheet" href="../assets/interactions.css" />
+</head>
+<body>
+<div class="container">
+  <nav class="lesson-nav">
+    <span class="badge ts">阶段一 · LESSON 0002</span>
+    <a href="index.html">📚 阶段目录</a>
+    <a href="../reference/everyday-types-cheatsheet.html">📄 速查表</a>
+    <a href="0001-what-is-typescript-and-everyday-types.html">← 上一课</a>
+    <a href="0003-narrowing.html">下一课 →</a>
+  </nav>
+
+  <h1>字面量类型、联合类型与类型别名</h1>
+  <p class="lead">本课小胜利：能让一个变量、参数或返回值被锁死在“一组固定的值”之内，
+    并能用 <code>type</code> 给这组值命名复用——这是写“领域模型”和“穷举枚举”的第一块砖。约 20 分钟。</p>
+
+  <!-- ============ 1 ============ -->
+  <h2>1 · 字面量类型 literal types：把“值”当“类型”用</h2>
+  <div class="card">
+    <p>之前 <code>string</code>、<code>number</code>、<code>boolean</code> 表示“任意字符串/数字/布尔”。
+      但很多时候你想要的更严格——<strong>只允许那几个具体值</strong>。
+      这时可以把<strong>字面量</strong>(literal, 即源码里直接写出来的值)本身当作类型:</p>
+    <pre><code><span class="tok-key">let</span> direction: <span class="tok-str">"up"</span> | <span class="tok-str">"down"</span> = <span class="tok-str">"up"</span>;   <span class="tok-com">// 字面量联合(稍后展开)</span>
+<span class="tok-key">let</span> lucky: 7 = 7;                              <span class="tok-com">// 仅允许 7</span>
+<span class="tok-key">let</span> on: <span class="tok-key">true</span> = <span class="tok-key">true</span>;                       <span class="tok-com">// 仅允许 true</span></code></pre>
+    <p>三种字面量都能作类型:<strong>字符串字面量类型</strong>(string literal)、<strong>数字字面量类型</strong>(number literal)、<strong>布尔字面量类型</strong>(boolean literal)。
+      它们各自也是类型,可以参与联合。</p>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#literal-types">Handbook · Literal Types</a>。</p>
+  </div>
+
+  <!-- ============ 2 ============ -->
+  <h2>2 · 联合类型 union <code>|</code>：只能是这几个值之一</h2>
+  <div class="card">
+    <p>用竖线 <code>|</code> 把若干类型串起来,就得到一个<strong>联合类型</strong>(union type,或称“或类型”)——
+      变量的值只需符合其中<strong>任意一个</strong>即可。最常见的写法是<strong>字符串字面量联合</strong>,
+      在业务里经常用来表达“枚举值”、“状态机”、“动作指令”等有限集合:</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Dir</span> = <span class="tok-str">"up"</span> | <span class="tok-str">"down"</span> | <span class="tok-str">"left"</span> | <span class="tok-str">"right"</span>;
+
+<span class="tok-key">function</span> move(d: <span class="tok-type">Dir</span>, step: <span class="tok-type">number</span>) { <span class="tok-com">/* ... */</span> }
+
+move(<span class="tok-str">"up"</span>, 1);          <span class="tok-com">// ✅</span>
+move(<span class="tok-str">"forward"</span>, 1);    <span class="tok-com">// ❌ </span><span class="tok-err">"forward" 不在 Dir 里</span></code></pre>
+    <p>联合不限于字面量,任意类型都能联合:</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Result</span> = <span class="tok-type">string</span> | <span class="tok-type">number</span>;          <span class="tok-com">// 字符串或数字</span>
+<span class="tok-key">type</span> <span class="tok-type">Maybe</span> = { id: <span class="tok-type">number</span> } | <span class="tok-key">null</span>;     <span class="tok-com">// 对象或 null(配合收窄)</span></code></pre>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#union-types">Handbook · Union Types</a>。</p>
+  </div>
+
+  <!-- ============ 3 ============ -->
+  <h2>3 · 类型别名 type alias：给一个类型起名字</h2>
+  <div class="card">
+    <p>字面量联合写一遍还行,到处复制就难受。<code>type</code> 关键字可以把<strong>任意类型表达式</strong>(基本类型、联合、对象、函数……)起一个名字复用:</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Dir</span> = <span class="tok-str">"up"</span> | <span class="tok-str">"down"</span> | <span class="tok-str">"left"</span> | <span class="tok-str">"right"</span>;
+<span class="tok-key">type</span> <span class="tok-type">UserId</span> = <span class="tok-type">string</span>;                     <span class="tok-com">// 别名,不是新类型</span>
+<span class="tok-key">type</span> <span class="tok-type">Point</span> = { x: <span class="tok-type">number</span>; y: <span class="tok-type">number</span> };      <span class="tok-com">// 对象类型也能别名</span>
+<span class="tok-key">type</span> <span class="tok-type">Handler</span> = (e: <span class="tok-type">MouseEvent</span>) =&gt; <span class="tok-type">void</span>;     <span class="tok-com">// 函数类型别名</span></code></pre>
+    <p>注意一个常见误解:<strong>别名只是“名字”,不是新类型</strong>。
+      <code>type UserId = string</code> 不会让 <code>UserId</code> 跟 <code>string</code> 不兼容——
+      它们在结构上是同一个类型(详见面 vs 标的区别要到阶段二)。</p>
+    <p class="tip">对象类型别名更多写法见
+      <a href="https://www.typescriptlang.org/docs/handbook/2/objects.html">Handbook · Object Types</a>。</p>
+  </div>
+
+  <!-- ============ 4 ============ -->
+  <h2>4 · 字面量联合 = 轻量“穷举枚举”模式</h2>
+  <div class="card">
+    <p>很多语言需要先声明 <code>enum</code> 才能表达“只能取这些值”。TS 里,
+      <strong>字符串字面量联合 + <code>type</code> 别名</strong> 是同等常见、且更轻量的替代:</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Status</span> = <span class="tok-str">"idle"</span> | <span class="tok-str">"loading"</span> | <span class="tok-str">"success"</span> | <span class="tok-str">"error"</span>;
+<span class="tok-key">type</span> <span class="tok-type">Color</span>  = <span class="tok-str">"red"</span>  | <span class="tok-str">"green"</span> | <span class="tok-str">"blue"</span>;
+<span class="tok-key">type</span> <span class="tok-type">Method</span> = <span class="tok-str">"GET"</span>  | <span class="tok-str">"POST"</span> | <span class="tok-str">"PUT"</span>  | <span class="tok-str">"DELETE"</span>;</code></pre>
+    <p>这种写法的好处是“结构透明、零运行时成本”——它就是字符串,没有额外对象。
+      后续会用它配合 <code>switch</code> 做<strong>穷尽性检查</strong>(exhaustiveness)。</p>
+    <p>TS 也提供真正的 <code>enum</code> 关键字,
+      <strong>留到阶段二 0005 详细对比</strong>(语义、值、编译产物都不一样)——
+      这里先把字面量联合的“穷举”用法练熟。</p>
+  </div>
+
+  <!-- ============ 5 ============ -->
+  <h2>5 · 常见坑 ①:字面量 widening(拓宽)</h2>
+  <div class="card warn">
+    <h3>字面量为何“消失”?<code>let</code> vs <code>const</code> 的推断差异</h3>
+    <p>这是这一节<strong>最常踩</strong>的坑。回到 0001 第 3 节的一个例子:</p>
+    <pre><code><span class="tok-key">let</span>  a = <span class="tok-str">"north"</span>;   <span class="tok-com">// 推断: string  ← 被拓宽了!</span>
+<span class="tok-key">const</span> b = <span class="tok-str">"north"</span>;   <span class="tok-com">// 推断: "north"  ← 仍是字面量类型</span></code></pre>
+    <p>原因:TS 默认会把 <code>let</code> 声明的字面量<strong>拓宽</strong>(widening)到它的基础类型,因为这个变量将来可能赋别的值;
+      <code>const</code> 声明的不能被重新赋值,所以被保留为更精确的字面量类型。</p>
+    <p>这在“希望它就是这几个字面量之一”时是个问题:</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Dir</span> = <span class="tok-str">"up"</span> | <span class="tok-str">"down"</span> | <span class="tok-str">"left"</span> | <span class="tok-str">"right"</span>;
+
+<span class="tok-key">let</span> heading = <span class="tok-str">"up"</span>;        <span class="tok-com">// 推断: string</span>
+move(heading, 1);               <span class="tok-com">// ❌ </span><span class="tok-err">string 不能赋给 Dir</span></code></pre>
+    <p><strong>修法</strong>有三种,推荐前两种:</p>
+    <ol>
+      <li>用 <code>const</code> 声明:<code>const heading = "up";</code> → 字面量类型保留。</li>
+      <li>显式注解:<code>let heading: Dir = "up";</code></li>
+      <li><code>as const</code> 断言:把整个表达式“冻结”为字面量(对象/数组里尤其常用):</li>
+    </ol>
+    <pre><code><span class="tok-key">const</span> dirs = [<span class="tok-str">"up"</span>, <span class="tok-str">"down"</span>] <span class="tok-key">as const</span>;     <span class="tok-com">// readonly ["up", "down"]</span>
+<span class="tok-key">const</span> cfg  = { mode: <span class="tok-str">"strict"</span> } <span class="tok-key">as const</span>; <span class="tok-com">// { readonly mode: "strict" }</span></code></pre>
+  </div>
+
+  <!-- ============ 6 ============ -->
+  <h2>6 · 联合类型的“使用门槛”:必须先收窄</h2>
+  <div class="card">
+    <p>当一个变量是联合类型时,<strong>只有所有分支共有的成员</strong>可以直接用:</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Pet</span> = { kind: <span class="tok-str">"dog"</span>; bark: () =&gt; <span class="tok-type">void</span> }
+      | { kind: <span class="tok-str">"cat"</span>; meow: () =&gt; <span class="tok-type">void</span> };
+
+<span class="tok-key">function</span> talk(p: <span class="tok-type">Pet</span>) {
+  p.bark();   <span class="tok-com">// ❌ </span><span class="tok-err">只有 cat 分支有 meow,dog 没有 bark</span>
+}</code></pre>
+    <p>必须先把“模糊的 union”<strong>收窄</strong>(narrow)到具体一个分支才能用其独有成员。
+      典型做法是看<strong>判别字段</strong>(上面是 <code>kind</code>):</p>
+    <pre><code><span class="tok-key">function</span> talk(p: <span class="tok-type">Pet</span>) {
+  <span class="tok-key">if</span> (p.kind === <span class="tok-str">"dog"</span>) p.bark();   <span class="tok-com">// ✅ 这里 p 被收窄到 dog 分支</span>
+  <span class="tok-key">else</span>                  p.meow();   <span class="tok-com">// ✅ 收窄到 cat 分支</span>
+}</code></pre>
+    <p>收窄(narrowing)的内容非常丰富——<code>typeof</code>、<code>in</code>、<code>instanceof</code>、判别字段、
+      控制流分析……<strong>整节课讲</strong>,下一课 0003 见。</p>
+    <p class="tip">承上启下:<a href="0003-narrowing.html">下一课 0003 · 类型收窄</a>。</p>
+  </div>
+
+  <!-- ============ 7 互动 ============ -->
+  <h2>7 · 动手 A:读出字面量 / 联合类型</h2>
+  <p>关键技能升级——看到字面量联合时,要能直接<strong>读出</strong>变量的类型。</p>
+
+  <div class="card">
+    <p>① <code>const mode = "strict";</code> 中 <code>mode</code> 的推断类型是?(写出字面量)</p>
+    <div class="type-check" data-widget="type-check"
+         data-answers="&quot;strict&quot;|&#39;strict&#39;|'strict'|&quot;strict&quot;"
+         data-ok="对!const 推断保留字面量,所以是 &quot;strict&quot;。"
+         data-bad="提示:const 不会被拓宽,字面量原样保留(带引号)。">
+      <input placeholder="类型…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p>② <code>let n = 42;</code> 中 <code>n</code> 的推断类型是?</p>
+    <div class="type-check" data-widget="type-check" data-answers="number"
+         data-ok="对!let 声明的数字字面量被拓宽为 number。"
+         data-bad="提示:let 会让字面量拓宽(参见第 5 节)。">
+      <input placeholder="类型…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 8 测验 ============ -->
+  <h2>8 · 测验:加深印象</h2>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="b"
+       data-ok="正确!let 会被拓宽为 string,不再是字面量联合,赋值给 Dir 就报错了。"
+       data-bad="回看第 5 节:let 声明的字面量被推断成了什么?">
+    <div class="q">Q1:<code>type Dir = "up" | "down"</code>; 以下哪行<strong>会报错</strong>?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a"><code>const d: Dir = "up";</code></button>
+      <button class="quiz-option" data-value="b"><code>let s = "up"; move(s, 1);</code>(假设 move 接收 Dir)</button>
+      <button class="quiz-option" data-value="c"><code>function f(d: Dir) { return d; }</code></button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="a"
+       data-ok="正确!字面量联合穷举时用 type + |,无需 enum;enum 是另一关键字,0005 再讲。"
+       data-bad="回看第 4 节:字面量联合的完整写法是?">
+    <div class="q">Q2:用“轻量穷举枚举”表达状态 <code>idle | loading | success | error</code>,最贴合 TS 习惯的写法是?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a"><code>type Status = "idle" | "loading" | "success" | "error";</code></button>
+      <button class="quiz-option" data-value="b"><code>let Status = "idle" + "loading" + ...;</code></button>
+      <button class="quiz-option" data-value="c"><code>const Status = [idle, loading, success, error];</code></button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 9 小结 ============ -->
+  <h2>9 · 小结与下一步</h2>
+  <div class="card">
+    <ul class="checklist">
+      <li>✅ 你现在能:把字面量当类型、用 <code>|</code> 表达“几个值之一”、用 <code>type</code> 命名复用。</li>
+      <li>✅ 能区分 <code>let</code> 的 widening 与 <code>const</code> 的字面量保留,并用 <code>as const</code> 冻结。</li>
+      <li>📖 权威阅读:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">Handbook · Everyday Types(Literal Types 一节)</a>;
+        对象类型别名:<a href="https://www.typescriptlang.org/docs/handbook/2/objects.html">Object Types</a>。</li>
+      <li>🛠 动手:去 <a href="https://www.typescriptlang.org/play">Playground</a> 敲出本课每段代码,鼠标悬停变量看 TS 推断的类型;
+        再把 <code>const</code> 改成 <code>let</code>,看类型如何从字面量拓宽为基础类型。</li>
+      <li>➡️ <a href="0003-narrowing.html">下一课 0003 · 类型收窄</a>:
+        如何把一个模糊的 union 安全地缩小到具体分支,从而使用该分支独有的成员。</li>
+    </ul>
+    <p class="tip"><strong>卡住就问我</strong>——我是你的老师,可就任意一点展开、换讲法、加练习。</p>
+  </div>
+
+  <div class="footer">
+    TypeScript 课程 · 阶段一 · 0002 ·
+    <a href="index.html">阶段目录</a> · <a href="../reference/everyday-types-cheatsheet.html">速查表</a> · <a href="../RESOURCES.md">资源</a>
+  </div>
+
+  <script src="../assets/interactions.js"></script>
+</div>
+</body>
+</html>

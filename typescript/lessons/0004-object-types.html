@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>0004 · 对象类型深入</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<link rel="stylesheet" href="../assets/interactions.css" />
+</head>
+<body>
+<div class="container">
+  <nav class="lesson-nav">
+    <span class="badge ts">阶段一 · LESSON 0004</span>
+    <a href="index.html">📚 阶段目录</a>
+    <a href="0003-narrowing.html">← 上一课</a>
+    <a href="0005-arrays-tuples-enums.html">下一课 →</a>
+  </nav>
+
+  <h1>对象类型深入</h1>
+  <p class="lead">本课小胜利：能为真实数据设计清晰的对象形状，正确处理可选与只读属性，读懂索引签名和多余属性检查，并用嵌套、<code>interface</code> 与交叉类型组合模型。约 28 分钟。</p>
+
+  <!-- ============ 1 ============ -->
+  <h2>1 · 对象类型描述的是“形状”</h2>
+  <div class="card">
+    <p>JavaScript 中大量数据都以对象存在；TypeScript 的<strong>对象类型（object type）</strong>描述对象必须有哪些属性，以及每个属性允许什么值。它关心的是<strong>形状</strong>，而不是对象由哪个构造器创建。</p>
+    <pre><code><span class="tok-key">function</span> showUser(user: { name: <span class="tok-type">string</span>; age: <span class="tok-type">number</span> }): <span class="tok-type">string</span> {
+  <span class="tok-key">return</span> <span class="tok-str">`${user.name}（${user.age} 岁）`</span>;
+}
+
+showUser({ name: <span class="tok-str">"Ada"</span>, age: 36 });           <span class="tok-com">// ✅ 形状匹配</span>
+showUser({ name: <span class="tok-str">"Ada"</span> });                    <span class="tok-com">// ❌ </span><span class="tok-err">缺少 age</span>
+showUser({ name: <span class="tok-str">"Ada"</span>, age: <span class="tok-str">"36"</span> });         <span class="tok-com">// ❌ </span><span class="tok-err">age 应为 number</span></code></pre>
+    <p>这种“只要形状兼容就可以赋值”的规则叫<strong>结构类型（structural typing）</strong>。后面看似奇怪的“多余属性检查”，正是在这个基础规则之上额外加的一层防错机制。</p>
+    <p class="tip">本课程继续假设 <code>tsconfig.json</code> 中开启 <code>"strict": true</code>。主要来源：<a href="https://www.typescriptlang.org/docs/handbook/2/objects.html">Handbook · Object Types</a>。</p>
+  </div>
+
+  <!-- ============ 2 ============ -->
+  <h2>2 · 同一个形状的三种写法</h2>
+  <div class="card">
+    <h3>写法一：内联匿名对象类型</h3>
+    <p><strong>内联匿名（inline anonymous）</strong>写法把类型直接放在使用处，适合只出现一次、很短的形状。</p>
+    <pre><code><span class="tok-com">// 例 1：类型紧挨参数，一眼就能看到契约</span>
+<span class="tok-key">function</span> move(point: { x: <span class="tok-type">number</span>; y: <span class="tok-type">number</span> }): <span class="tok-type">number</span> {
+  <span class="tok-key">return</span> point.x + point.y;
+}</code></pre>
+    <p>若同一形状反复出现，继续内联会重复；这时应给它一个名字。</p>
+  </div>
+
+  <div class="card">
+    <h3>写法二：<code>type</code> 类型别名</h3>
+    <p><strong>类型别名（type alias）</strong>用 <code>type</code> 为一个类型命名。它不仅能表示对象，也能表示联合类型、交叉类型等。</p>
+    <pre><code><span class="tok-com">// 例 2：命名后可在参数、变量、返回值中复用</span>
+<span class="tok-key">type</span> Point = {
+  x: <span class="tok-type">number</span>;
+  y: <span class="tok-type">number</span>;
+};
+
+<span class="tok-key">function</span> move(point: Point): <span class="tok-type">number</span> {
+  <span class="tok-key">return</span> point.x + point.y;
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>写法三：<code>interface</code> 接口</h3>
+    <p><strong>接口（interface）</strong>也能为对象形状命名，成员写法与 <code>type</code> 几乎相同。</p>
+    <pre><code><span class="tok-com">// 例 3：当前用法与上面的 Point 等价</span>
+<span class="tok-key">interface</span> Point {
+  x: <span class="tok-type">number</span>;
+  y: <span class="tok-type">number</span>;
+}
+
+<span class="tok-key">const</span> origin: Point = { x: 0, y: 0 };</code></pre>
+    <p><strong>此刻不必纠结二选一</strong>：表达普通对象形状时，两者都很好；遵循项目现有风格即可。它们的基本差异会在第 8 节点到。</p>
+  </div>
+
+  <!-- ============ 3 ============ -->
+  <h2>3 · 可选属性 <code>?</code>：可以缺席，不等于随时安全</h2>
+  <div class="card">
+    <p>属性名后的 <code>?</code> 表示<strong>可选属性（optional property）</strong>：创建对象时可以不提供它。</p>
+    <pre><code><span class="tok-com">// 例 4：nickname 可以存在，也可以缺席</span>
+<span class="tok-key">type</span> User = {
+  id: <span class="tok-type">number</span>;
+  name: <span class="tok-type">string</span>;
+  nickname?: <span class="tok-type">string</span>;
+};
+
+<span class="tok-key">const</span> ada: User = { id: 1, name: <span class="tok-str">"Ada"</span> };       <span class="tok-com">// ✅ 可省略 nickname</span>
+<span class="tok-key">const</span> lin: User = { id: 2, name: <span class="tok-str">"Lin"</span>, nickname: <span class="tok-str">"L"</span> };</code></pre>
+    <p>但<strong>读取</strong> <code>user.nickname</code> 时，它的类型是 <code>string | undefined</code>：属性缺席时，JavaScript 读出的就是 <code>undefined</code>。因此不能直接当 <code>string</code> 使用。</p>
+    <pre><code><span class="tok-key">function</span> label(user: User): <span class="tok-type">string</span> {
+  user.nickname.toUpperCase();
+  <span class="tok-com">// ❌ </span><span class="tok-err">“user.nickname”可能为 undefined</span>
+
+  <span class="tok-key">if</span> (user.nickname !== <span class="tok-key">undefined</span>) {
+    <span class="tok-key">return</span> user.nickname.toUpperCase(); <span class="tok-com">// ✅ 判空后缩窄为 string</span>
+  }
+  <span class="tok-key">return</span> user.name.toUpperCase();
+}</code></pre>
+    <p>短表达式可用<strong>可选链（optional chaining）</strong>和空值合并：</p>
+    <pre><code><span class="tok-key">const</span> nickname = user.nickname?.toUpperCase() ?? <span class="tok-str">"未设置"</span>;</code></pre>
+    <p class="tip"><code>nickname?: string</code> 与 <code>nickname: string | undefined</code> 不完全相同：前者允许属性整个缺席；后者要求属性必须存在，只是它的值可以为 <code>undefined</code>。</p>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ①：写了 <code>?</code>，读取时却忘了判空</h3>
+    <p><code>?</code> 放宽的是“创建对象时是否必须提供”，不是承诺“使用时一定有值”。不要用 <code>user.nickname!</code> 随手压掉错误；只有当你掌握编译器不知道的可靠事实时，非空断言 <code>!</code> 才合理。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="b"
+       data-ok="正确！可选属性缺席时会读到 undefined，所以读取类型是 string | undefined。"
+       data-bad="回看可选属性：对象没有 nickname 时，JavaScript 读取它会得到什么？">
+    <div class="q">Q1：在 <code>strict</code> 下，<code>nickname?: string</code> 的 <code>user.nickname</code> 读取类型是什么？</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a"><code>string</code></button>
+      <button class="quiz-option" data-value="b"><code>string | undefined</code></button>
+      <button class="quiz-option" data-value="c"><code>any</code></button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 4 ============ -->
+  <h2>4 · 只读属性 <code>readonly</code>：编译期防止重新赋值</h2>
+  <div class="card">
+    <p>属性名前加 <code>readonly</code>，表示<strong>只读属性（readonly property）</strong>。对象创建后，TypeScript 不允许通过该属性重新赋值。</p>
+    <pre><code><span class="tok-com">// 例 5：订单编号一旦创建便不应改变</span>
+<span class="tok-key">interface</span> Order {
+  <span class="tok-key">readonly</span> id: <span class="tok-type">string</span>;
+  status: <span class="tok-str">"pending"</span> | <span class="tok-str">"paid"</span>;
+}
+
+<span class="tok-key">const</span> order: Order = { id: <span class="tok-str">"A-001"</span>, status: <span class="tok-str">"pending"</span> };
+order.status = <span class="tok-str">"paid"</span>;  <span class="tok-com">// ✅ 普通属性可修改</span>
+order.id = <span class="tok-str">"A-002"</span>;     <span class="tok-com">// ❌ </span><span class="tok-err">无法分配到 id，因为它是只读属性</span></code></pre>
+    <p><code>readonly</code> 是<strong>编译期约束</strong>，不会在生成的 JavaScript 中冻结对象。它还是<strong>浅层的</strong>：只禁止替换属性本身，不会自动把属性内部的对象或数组也变只读。</p>
+    <pre><code><span class="tok-key">interface</span> Project {
+  <span class="tok-key">readonly</span> tags: <span class="tok-type">string</span>[];
+}
+
+<span class="tok-key">const</span> project: Project = { tags: [<span class="tok-str">"ts"</span>] };
+project.tags = [];       <span class="tok-com">// ❌ 不能替换 tags</span>
+project.tags.push(<span class="tok-str">"web"</span>); <span class="tok-com">// ✅ 数组本身仍然可变</span></code></pre>
+    <p>若连数组元素也不应改，可把属性写成 <code>readonly tags: readonly string[]</code>。记住：它提供类型检查，不等同于运行时的 <code>Object.freeze()</code>。</p>
+  </div>
+
+  <!-- ============ 5 ============ -->
+  <h2>5 · 索引签名：描述“键名未知，值类型已知”</h2>
+  <div class="card">
+    <p>有些对象的属性名要到运行时才知道，例如各科成绩、商品库存。这时用<strong>索引签名（index signature）</strong>：</p>
+    <pre><code><span class="tok-com">// 例 6：任意 string 键，都必须对应 number 值</span>
+<span class="tok-key">type</span> Scores = {
+  [key: <span class="tok-type">string</span>]: <span class="tok-type">number</span>;
+};
+
+<span class="tok-key">const</span> scores: Scores = {
+  math: 95,
+  history: 88,
+};
+
+scores.physics = 91;       <span class="tok-com">// ✅ number</span>
+scores.english = <span class="tok-str">"A"</span>;     <span class="tok-com">// ❌ </span><span class="tok-err">string 不能赋给 number</span>
+<span class="tok-key">const</span> subject = <span class="tok-str">"math"</span>;
+<span class="tok-key">const</span> result = scores[subject]; <span class="tok-com">// 动态键用方括号读取</span></code></pre>
+    <p><code>key</code> 只是参数名，可换成 <code>subject</code> 等更有语义的名字；真正的契约是“所有字符串键的值都是 <code>number</code>”。因此，同一类型中明确写出的属性也必须服从索引签名：</p>
+    <pre><code><span class="tok-key">interface</span> BrokenScores {
+  [key: <span class="tok-type">string</span>]: <span class="tok-type">number</span>;
+  total: <span class="tok-type">number</span>; <span class="tok-com">// ✅ 符合索引签名</span>
+  name: <span class="tok-type">string</span>;  <span class="tok-com">// ❌ </span><span class="tok-err">string 属性不符合 number 值类型</span>
+}</code></pre>
+    <p class="tip"><strong>更严格的动态读取：</strong>默认情况下，<code>scores["不存在"]</code> 的静态类型仍是 <code>number</code>，但运行时会得到 <code>undefined</code>。项目开启 <code>noUncheckedIndexedAccess</code> 后，这类读取会变成 <code>number | undefined</code>，迫使你判空。</p>
+  </div>
+
+  <div class="card">
+    <p>练习：补全索引签名，使每个商品编号都映射到库存数量。</p>
+    <pre><code><span class="tok-key">type</span> Stock = {
+  [productId: <span class="tok-type">string</span>]: ____;
+};</code></pre>
+    <div class="type-check" data-widget="type-check" data-answers="number"
+         data-ok="对！库存数量是 number，所以任意 string 键都映射到 number。"
+         data-bad="提示：例子中的库存数量会做加减运算，应使用哪种基本类型？">
+      <input placeholder="类型…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 6 ============ -->
+  <h2>6 · 多余属性检查：为什么直接写会更严格</h2>
+  <div class="card">
+    <p>先看最容易让初学者困惑的一组代码：</p>
+    <pre><code><span class="tok-com">// 例 7：目标类型只要求 name 和 age</span>
+<span class="tok-key">interface</span> Profile {
+  name: <span class="tok-type">string</span>;
+  age: <span class="tok-type">number</span>;
+}
+
+<span class="tok-key">function</span> saveProfile(profile: Profile): <span class="tok-type">void</span> {}
+
+saveProfile({ name: <span class="tok-str">"Ada"</span>, age: 36, admin: <span class="tok-key">true</span> });
+<span class="tok-com">// ❌ </span><span class="tok-err">对象字面量只能指定已知属性，admin 不在 Profile 中</span>
+
+<span class="tok-key">const</span> candidate = { name: <span class="tok-str">"Ada"</span>, age: 36, admin: <span class="tok-key">true</span> };
+saveProfile(candidate); <span class="tok-com">// ✅ 变量中转后，结构兼容：所需属性都存在</span></code></pre>
+    <p>这不是前后矛盾，而是两条规则叠加：</p>
+    <ol>
+      <li><strong>一般赋值规则是结构兼容：</strong>来源对象至少拥有目标类型要求的属性即可，多一些通常没问题。</li>
+      <li><strong>新鲜对象字面量有额外检查：</strong>对象字面量直接赋给已知类型、或直接作为参数传入时，TypeScript 会执行<strong>多余属性检查（excess property checks）</strong>，专门捕捉拼写错误和误传字段。</li>
+    </ol>
+    <pre><code><span class="tok-key">const</span> bad: Profile = { name: <span class="tok-str">"Ada"</span>, age: 36, agge: 36 };
+<span class="tok-com">//                                                   ^ ❌ 很可能是 age 的拼写错误</span></code></pre>
+    <p>所以“变量中转”确实会绕过这项<strong>额外</strong>检查，但不会删除运行时的 <code>admin</code>，也不应把它当成隐藏建模问题的技巧。若额外键本来就是需求，应在类型里明确表达。</p>
+  </div>
+
+  <div class="card">
+    <h3>需要开放额外键时：使用索引签名</h3>
+    <pre><code><span class="tok-com">// 例 8：name 必须是 string，同时允许其他未知属性</span>
+<span class="tok-key">interface</span> FlexibleProfile {
+  name: <span class="tok-type">string</span>;
+  [key: <span class="tok-type">string</span>]: <span class="tok-type">unknown</span>;
+}
+
+<span class="tok-key">const</span> profile: FlexibleProfile = {
+  name: <span class="tok-str">"Ada"</span>,
+  age: 36,
+  admin: <span class="tok-key">true</span>,
+}; <span class="tok-com">// ✅ 额外键的值先按 unknown 安全接收</span></code></pre>
+    <p>使用 <code>unknown</code> 意味着读取额外字段后仍要缩窄类型，比 <code>any</code> 安全。如果键集合其实是固定的，就应明确列出属性，而不是加一个过宽的索引签名。</p>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ②：以为 TypeScript 使用“精确对象类型”</h3>
+    <p><code>Profile</code> 的含义不是“只能有 <code>name</code> 和 <code>age</code>”，而是“至少满足这些成员”。多余属性检查只针对新鲜对象字面量，目的是尽早抓住可疑字段；变量中转回到普通的结构兼容规则，所以行为才会“看起来奇怪”。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="c"
+       data-ok="正确！变量按普通结构兼容规则检查；它拥有 Profile 所需的 name 和 age，所以可传入。"
+       data-bad="关键区别是：直接传入的新鲜对象字面量会多做哪一层检查？">
+    <div class="q">Q2：为什么 <code>saveProfile(candidate)</code> 能通过，而同样形状的对象字面量直接传入会报多余属性错误？</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">变量中转会在运行时删除 <code>admin</code></button>
+      <button class="quiz-option" data-value="b"><code>candidate</code> 自动变成了 <code>any</code></button>
+      <button class="quiz-option" data-value="c">变量使用普通结构兼容规则，不再接受新鲜对象字面量的额外检查</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 7 ============ -->
+  <h2>7 · 嵌套对象：从外到内逐层描述</h2>
+  <div class="card">
+    <p><strong>嵌套对象类型（nested object type）</strong>没有新语法：某个属性的类型本身继续写成对象类型即可。复杂模型建议把有独立含义的层级拆成命名类型。</p>
+    <pre><code><span class="tok-com">// 例 9：地址可选，订单项是对象数组</span>
+<span class="tok-key">type</span> Address = {
+  city: <span class="tok-type">string</span>;
+  postalCode: <span class="tok-type">string</span>;
+};
+
+<span class="tok-key">type</span> OrderItem = {
+  sku: <span class="tok-type">string</span>;
+  quantity: <span class="tok-type">number</span>;
+};
+
+<span class="tok-key">interface</span> CustomerOrder {
+  id: <span class="tok-type">string</span>;
+  customer: {
+    name: <span class="tok-type">string</span>;
+    address?: Address;
+  };
+  items: OrderItem[];
+}
+
+<span class="tok-key">const</span> order: CustomerOrder = {
+  id: <span class="tok-str">"A-001"</span>,
+  customer: { name: <span class="tok-str">"Lin"</span> },
+  items: [{ sku: <span class="tok-str">"TS-BOOK"</span>, quantity: 2 }],
+};</code></pre>
+    <p>校验会逐层发生：<code>items</code> 中每个元素都必须同时拥有 <code>sku</code> 与 <code>quantity</code>。访问可选的 <code>address</code> 时，也要在对应层级处理 <code>undefined</code>：</p>
+    <pre><code><span class="tok-key">const</span> city = order.customer.address?.city ?? <span class="tok-str">"城市未知"</span>;</code></pre>
+  </div>
+
+  <div class="card">
+    <p>练习：<code>address</code> 是可选属性。补上一个运算符，让地址缺席时不会直接访问 <code>city</code>。</p>
+    <pre><code><span class="tok-key">const</span> city = order.customer.address____city;</code></pre>
+    <div class="type-check" data-widget="type-check" data-answers="?."
+         data-ok="对！可选链 ?. 会在 address 为 undefined 时停止访问并返回 undefined。"
+         data-bad="提示：本节示例在 address 和 city 之间使用了可选链运算符。">
+      <input placeholder="运算符…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 8 ============ -->
+  <h2>8 · <code>interface</code>、<code>type</code> 与交叉类型 <code>&amp;</code></h2>
+  <div class="card">
+    <p>阶段一先掌握最基本的选择依据；继承、联合与高级组合会在阶段二深入。</p>
+    <table>
+      <tr><th>能力</th><th><code>interface</code></th><th><code>type</code></th></tr>
+      <tr><td>描述对象形状</td><td>可以</td><td>可以</td></tr>
+      <tr><td>扩展已有对象</td><td>可用 <code>extends</code></td><td>可用交叉类型 <code>&amp;</code></td></tr>
+      <tr><td>同名声明合并</td><td>可以，成员会合并</td><td>不可以重复声明同名别名</td></tr>
+      <tr><td>直接表示联合类型</td><td>不可以</td><td>可以，如 <code>type Id = string | number</code></td></tr>
+    </table>
+    <pre><code><span class="tok-com">// interface：extends + 声明合并</span>
+<span class="tok-key">interface</span> Person {
+  name: <span class="tok-type">string</span>;
+}
+<span class="tok-key">interface</span> Employee <span class="tok-key">extends</span> Person {
+  employeeId: <span class="tok-type">number</span>;
+}
+
+<span class="tok-key">interface</span> WindowOptions { width: <span class="tok-type">number</span>; }
+<span class="tok-key">interface</span> WindowOptions { height: <span class="tok-type">number</span>; }
+<span class="tok-com">// WindowOptions 最终同时拥有 width 和 height</span>
+
+<span class="tok-com">// type：可以给对象之外的类型命名</span>
+<span class="tok-key">type</span> Id = <span class="tok-type">string</span> | <span class="tok-type">number</span>;</code></pre>
+    <p class="tip"><strong>阶段一经验法则：</strong>以对象为主、希望允许扩展或声明合并时可选 <code>interface</code>；需要联合或交叉组合时选 <code>type</code>。普通对象两者都能胜任，优先保持项目一致，而不是争论“唯一正确答案”。来源：<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">Handbook · Everyday Types</a>。</p>
+  </div>
+
+  <div class="card">
+    <h3>交叉类型：要求同时满足多个类型</h3>
+    <p><strong>交叉类型（intersection type）</strong>用 <code>&amp;</code> 组合类型。对对象而言，结果需要同时拥有两边要求的全部成员。</p>
+    <pre><code><span class="tok-com">// 例 10：组合业务数据和审计字段</span>
+<span class="tok-key">type</span> Article = {
+  title: <span class="tok-type">string</span>;
+  body: <span class="tok-type">string</span>;
+};
+
+<span class="tok-key">type</span> Timestamped = {
+  createdAt: <span class="tok-type">Date</span>;
+  updatedAt: <span class="tok-type">Date</span>;
+};
+
+<span class="tok-key">type</span> SavedArticle = Article &amp; Timestamped;
+
+<span class="tok-key">const</span> article: SavedArticle = {
+  title: <span class="tok-str">"对象类型"</span>,
+  body: <span class="tok-str">"……"</span>,
+  createdAt: <span class="tok-key">new</span> Date(),
+  updatedAt: <span class="tok-key">new</span> Date(),
+};</code></pre>
+    <p><code>&amp;</code> 不是简单地“后者覆盖前者”。若同名属性要求冲突，例如 <code>{ id: string } &amp; { id: number }</code>，那么 <code>id</code> 必须同时是 <code>string</code> 和 <code>number</code>，实际会落到无法正常提供的 <code>never</code>。组合前应确保同名成员兼容。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="a"
+       data-ok="正确！交叉类型要求同时满足 Article 和 Timestamped 的全部成员。"
+       data-bad="注意 & 表示“同时满足”，不是二选一。">
+    <div class="q">Q3：变量类型是 <code>Article &amp; Timestamped</code> 时，它必须具备哪些属性？</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">两边要求的全部属性</button>
+      <button class="quiz-option" data-value="b">任选一边的属性即可</button>
+      <button class="quiz-option" data-value="c">只保留两边同名的属性</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 9 ============ -->
+  <h2>9 · 综合练习：把规则串起来</h2>
+  <div class="card">
+    <p>阅读类型并判断报错原因：</p>
+    <pre><code><span class="tok-key">interface</span> Config {
+  <span class="tok-key">readonly</span> appName: <span class="tok-type">string</span>;
+  theme?: <span class="tok-str">"light"</span> | <span class="tok-str">"dark"</span>;
+  limits: { [key: <span class="tok-type">string</span>]: <span class="tok-type">number</span> };
+}
+
+<span class="tok-key">const</span> config: Config = {
+  appName: <span class="tok-str">"Teach Me"</span>,
+  limits: { uploads: 10 },
+};
+
+config.appName = <span class="tok-str">"New Name"</span>;        <span class="tok-com">// ① 报错：readonly</span>
+config.theme.toUpperCase();          <span class="tok-com">// ② 报错：可能为 undefined</span>
+config.limits.users = <span class="tok-str">"100"</span>;           <span class="tok-com">// ③ 报错：索引值必须为 number</span></code></pre>
+    <p>要修复第 ③ 处，<code>"100"</code> 应改成什么基本类型的值？填类型词。</p>
+    <div class="type-check" data-widget="type-check" data-answers="number"
+         data-ok="对！limits 的索引签名规定所有 string 键都映射到 number。"
+         data-bad="提示：{ [key: string]: number } 的冒号右边规定了值类型。">
+      <input placeholder="类型…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 下一步 ============ -->
+  <h2>10 · 小结与下一步</h2>
+  <div class="card">
+    <ul class="checklist">
+      <li>✅ 你现在能：用内联匿名、<code>type</code>、<code>interface</code> 描述对象，并用嵌套和 <code>&amp;</code> 组合形状。</li>
+      <li>✅ 你知道：可选属性读出是 <code>T | undefined</code>；<code>readonly</code> 是浅层、编译期防改；索引签名约束所有动态键的值。</li>
+      <li>✅ 你能解释：对象字面量为何有多余属性检查，变量中转为何回到结构兼容规则，以及何时应明确加入索引签名。</li>
+      <li>📖 权威阅读：<a href="https://www.typescriptlang.org/docs/handbook/2/objects.html">官方 Handbook · Object Types</a>（本课主要来源）与 <a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">Everyday Types</a>。</li>
+      <li>🛠 动手：去官方 <a href="https://www.typescriptlang.org/play">Playground</a>，依次删除可选属性、修改只读属性、直接传多余字段，再把对象放进变量，对照每条错误信息。</li>
+      <li>➡️ <a href="0005-arrays-tuples-enums.html">下一课 0005</a>：数组、元组与枚举——继续描述一组值的结构与位置约束。</li>
+    </ul>
+    <p class="tip"><strong>卡住就问我</strong>——我是你的老师，可以就任意一点展开、换讲法、加练习。</p>
+  </div>
+
+  <div class="footer">
+    TypeScript 课程 · 阶段一 · 0004 ·
+    <a href="index.html">阶段目录</a> · <a href="0003-narrowing.html">上一课</a> · <a href="0005-arrays-tuples-enums.html">下一课</a>
+  </div>
+
+  <script src="../assets/interactions.js"></script>
+</div>
+</body>
+</html>

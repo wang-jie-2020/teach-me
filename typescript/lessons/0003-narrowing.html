@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>0003 · 类型收窄 Narrowing</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<link rel="stylesheet" href="../assets/interactions.css" />
+</head>
+<body>
+<div class="container">
+  <nav class="lesson-nav">
+    <span class="badge ts">阶段一 · LESSON 0003</span>
+    <a href="index.html">📚 阶段目录</a>
+    <a href="0002-literal-and-union-types.html">← 上一课</a>
+    <a href="0004-object-types.html">下一课 →</a>
+  </nav>
+
+  <h1>类型收窄 Narrowing</h1>
+  <p class="lead">本课小胜利：拿到一个联合类型（union type）后，能用运行时检查让 TypeScript 准确知道“此刻是哪一种类型”，并用<strong>可辨识联合 + 穷尽检查</strong>写出不漏分支的业务逻辑。约 28 分钟。</p>
+
+  <!-- ============ 1 ============ -->
+  <h2>1 · 为什么需要收窄：联合类型只能使用“共同能力”</h2>
+  <div class="card">
+    <p>上一课学过联合类型：<code>number | string</code> 表示一个值可能是数字，也可能是字符串。问题是，编译器在不知道具体是哪一种之前，只允许你使用<strong>每个成员都安全支持</strong>的操作。</p>
+    <pre><code><span class="tok-key">function</span> format(value: <span class="tok-type">number</span> | <span class="tok-type">string</span>): <span class="tok-type">string</span> {
+  <span class="tok-key">return</span> value.toUpperCase();
+  <span class="tok-com">//     ❌ </span><span class="tok-err">number 上不存在 toUpperCase</span>
+}</code></pre>
+    <p>即使你心里知道调用时“通常传字符串”，函数体仍必须对类型声明里的<strong>所有可能</strong>负责。正确做法是先问一个运行时能回答的问题，再使用对应类型的能力：</p>
+    <pre><code><span class="tok-key">function</span> format(value: <span class="tok-type">number</span> | <span class="tok-type">string</span>): <span class="tok-type">string</span> {
+  <span class="tok-key">if</span> (<span class="tok-key">typeof</span> value === <span class="tok-str">"string"</span>) {
+    <span class="tok-key">return</span> value.toUpperCase(); <span class="tok-com">// 此处 value: string</span>
+  }
+  <span class="tok-key">return</span> value.toFixed(2);    <span class="tok-com">// 此处 value: number</span>
+}</code></pre>
+    <p>这种让类型从较宽的联合类型缩小为更具体类型的过程，叫<strong>类型收窄（narrowing）</strong>；触发收窄的检查叫<strong>类型守卫（type guard）</strong>。</p>
+  </div>
+
+  <div class="card">
+    <h3>编译器做的事：控制流分析</h3>
+    <p>TypeScript 不只是逐行看类型，它会分析 <code>if</code>、<code>switch</code>、<code>return</code> 等控制流。上例的第一个分支已经处理并返回了 <code>string</code>，所以到最后一行时，剩余可能性只能是 <code>number</code>。这叫<strong>控制流分析（control flow analysis）</strong>。</p>
+    <table>
+      <tr><th>位置</th><th>编译器眼中的 value</th><th>为什么</th></tr>
+      <tr><td>进入函数</td><td><code>number | string</code></td><td>两种都可能</td></tr>
+      <tr><td><code>typeof === "string"</code> 分支内</td><td><code>string</code></td><td>守卫保留了字符串</td></tr>
+      <tr><td>分支返回后的下一行</td><td><code>number</code></td><td><code>string</code> 路径已结束</td></tr>
+    </table>
+    <p class="tip">权威来源：<a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html">TypeScript Handbook · Narrowing</a>。本课示例均假设开启 <code>strict</code>。</p>
+  </div>
+
+  <!-- ============ 2 ============ -->
+  <h2>2 · typeof 类型守卫：先区分 JavaScript 基本类型</h2>
+  <div class="card">
+    <p><code>typeof value</code> 会在运行时返回一个字符串。TypeScript 认识这些比较，并据此收窄：</p>
+    <table>
+      <tr><th>守卫</th><th>分支内类型</th><th>常见用途</th></tr>
+      <tr><td><code>typeof x === "string"</code></td><td><code>string</code></td><td>字符串方法、长度</td></tr>
+      <tr><td><code>typeof x === "number"</code></td><td><code>number</code></td><td>算术、<code>toFixed</code></td></tr>
+      <tr><td><code>typeof x === "boolean"</code></td><td><code>boolean</code></td><td>布尔分支</td></tr>
+      <tr><td><code>typeof x === "undefined"</code></td><td><code>undefined</code></td><td>缺失值检查</td></tr>
+      <tr><td><code>typeof x === "object"</code></td><td>对象，但也可能是 <code>null</code></td><td>必须继续排除 <code>null</code></td></tr>
+    </table>
+    <p>JavaScript 还可能返回 <code>"bigint"</code>、<code>"symbol"</code> 和 <code>"function"</code>。关键不是背表，而是记住：<strong><code>typeof</code> 是运行时检查，TS 借它理解当前分支</strong>。</p>
+  </div>
+
+  <div class="card">
+    <h3>例 1：一层层剥开联合类型</h3>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Input</span> = <span class="tok-type">string</span> | <span class="tok-type">number</span> | <span class="tok-type">boolean</span>;
+
+<span class="tok-key">function</span> describe(input: <span class="tok-type">Input</span>): <span class="tok-type">string</span> {
+  <span class="tok-key">if</span> (<span class="tok-key">typeof</span> input === <span class="tok-str">"string"</span>) {
+    <span class="tok-key">return</span> <span class="tok-str">`文本，共 ${input.length} 个字符`</span>;
+  }
+  <span class="tok-key">if</span> (<span class="tok-key">typeof</span> input === <span class="tok-str">"number"</span>) {
+    <span class="tok-key">return</span> <span class="tok-str">`数字，保留两位：${input.toFixed(2)}`</span>;
+  }
+  <span class="tok-key">return</span> input ? <span class="tok-str">"已开启"</span> : <span class="tok-str">"已关闭"</span>; <span class="tok-com">// 剩下 boolean</span>
+}</code></pre>
+    <p>第二个 <code>if</code> 不是重新从三种类型开始：第一条路径返回后，此处起始类型已经只剩 <code>number | boolean</code>。收窄会沿着控制流持续生效。</p>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ①：typeof null === "object"</h3>
+    <p>这是 JavaScript 的历史行为：<code>typeof null</code> 的结果也是 <code>"object"</code>。因此只检查 <code>typeof value === "object"</code>，并不能保证值真的可以读取属性。</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Profile</span> = { name: <span class="tok-type">string</span> };
+
+<span class="tok-key">function</span> printName(value: <span class="tok-type">Profile</span> | <span class="tok-key">null</span>) {
+  <span class="tok-key">if</span> (<span class="tok-key">typeof</span> value === <span class="tok-str">"object"</span>) {
+    value.name; <span class="tok-com">// ❌ </span><span class="tok-err">value 仍可能是 null</span>
+  }
+
+  <span class="tok-key">if</span> (<span class="tok-key">typeof</span> value === <span class="tok-str">"object"</span> &amp;&amp; value !== <span class="tok-key">null</span>) {
+    value.name; <span class="tok-com">// ✅ value: Profile</span>
+  }
+}</code></pre>
+    <p>固定写法：检查对象时同时写 <code>value !== null</code>。数组的 <code>typeof</code> 也是 <code>"object"</code>；若要专门识别数组，应使用 <code>Array.isArray(value)</code>。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="b"
+       data-ok="正确！typeof null 也是 object，所以还必须检查 value !== null。"
+       data-bad="回看上面的历史陷阱：哪一个特殊值的 typeof 也是 object？">
+    <div class="q">Q1：对于 <code>value: { name: string } | null</code>，哪个条件能安全地把它收窄成对象？</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a"><code>typeof value === "object"</code></button>
+      <button class="quiz-option" data-value="b"><code>typeof value === "object" &amp;&amp; value !== null</code></button>
+      <button class="quiz-option" data-value="c"><code>typeof value !== "string"</code></button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 3 ============ -->
+  <h2>3 · 真值收窄 Truthiness Narrowing：先排除“假值”</h2>
+  <div class="card">
+    <p>JavaScript 把条件里的值转换成布尔值。<code>false</code>、<code>0</code>、<code>""</code>、<code>null</code>、<code>undefined</code> 和 <code>NaN</code> 都是假值（falsy）；其他值通常是真值（truthy）。TypeScript 能利用 <code>if (x)</code>、<code>!x</code>、<code>&amp;&amp;</code> 等表达式收窄。</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">State</span> = <span class="tok-str">"ready"</span> | <span class="tok-str">""</span> | 0 | 1 | <span class="tok-key">null</span> | <span class="tok-key">undefined</span>;
+
+<span class="tok-key">function</span> run(state: <span class="tok-type">State</span>) {
+  <span class="tok-key">if</span> (state) {
+    state; <span class="tok-com">// 1 | "ready"：假值成员都被排除了</span>
+  } <span class="tok-key">else</span> {
+    state; <span class="tok-com">// "" | 0 | null | undefined</span>
+  }
+}</code></pre>
+    <p>字面量联合能精确表示 <code>0</code> 与 <code>""</code>，所以收窄结果很精确。若原类型是宽泛的 <code>string | null</code>，进入 <code>if</code> 后会得到 <code>string</code>；但在 <code>else</code> 中不能只当成 <code>null</code>，因为宽泛的 <code>string</code> 仍包含空字符串。</p>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ②：0 和空字符串可能是合法数据</h3>
+    <p>真值检查是在问“它是否为真”，不等于只问“它是否为空”。如果 <code>0</code> 或 <code>""</code> 有业务意义，<code>if (value)</code> 会把它们一起挡掉。</p>
+    <pre><code><span class="tok-key">function</span> showScore(score: <span class="tok-type">number</span> | <span class="tok-key">null</span>) {
+  <span class="tok-key">if</span> (score) {
+    console.log(score); <span class="tok-com">// 分数 0 不会进入这里！</span>
+  }
+
+  <span class="tok-key">if</span> (score !== <span class="tok-key">null</span>) {
+    console.log(score); <span class="tok-com">// ✅ 0 也会显示</span>
+  }
+}</code></pre>
+    <p><strong>选择原则：</strong>只有当所有假值都代表“没有数据”时才用真值收窄；否则明确比较 <code>null</code> 或 <code>undefined</code>。</p>
+  </div>
+
+  <!-- ============ 4 ============ -->
+  <h2>4 · 相等收窄：用 === / !== 精确命中字面量</h2>
+  <div class="card">
+    <p>与一个字面量做严格相等或不等比较，会保留或排除对应成员。这比真值检查更精确，也更能表达业务含义。</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Command</span> = <span class="tok-str">"start"</span> | <span class="tok-str">"pause"</span> | <span class="tok-str">"stop"</span>;
+
+<span class="tok-key">function</span> handle(command: <span class="tok-type">Command</span>) {
+  <span class="tok-key">if</span> (command === <span class="tok-str">"start"</span>) {
+    command; <span class="tok-com">// "start"</span>
+    <span class="tok-key">return</span> <span class="tok-str">"开始运行"</span>;
+  }
+
+  command; <span class="tok-com">// "pause" | "stop"，"start" 已被排除</span>
+  <span class="tok-key">if</span> (command !== <span class="tok-str">"stop"</span>) {
+    command; <span class="tok-com">// "pause"</span>
+  }
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>例 2：分别处理 null、undefined 与有效值</h3>
+    <pre><code><span class="tok-key">function</span> label(value: <span class="tok-type">string</span> | <span class="tok-key">null</span> | <span class="tok-key">undefined</span>): <span class="tok-type">string</span> {
+  <span class="tok-key">if</span> (value === <span class="tok-key">null</span>) {
+    <span class="tok-key">return</span> <span class="tok-str">"已主动清空"</span>;
+  }
+  <span class="tok-key">if</span> (value === <span class="tok-key">undefined</span>) {
+    <span class="tok-key">return</span> <span class="tok-str">"尚未提供"</span>;
+  }
+  <span class="tok-key">return</span> value.toUpperCase(); <span class="tok-com">// value: string，"" 仍合法</span>
+}</code></pre>
+    <p>这里不能用一个 <code>if (value)</code> 替代，因为函数刻意区分了 <code>null</code>、<code>undefined</code> 和空字符串。严格相等检查让运行时语义与类型收窄完全对齐。</p>
+  </div>
+
+  <!-- ============ 5 ============ -->
+  <h2>5 · in 操作符：按“有没有这个属性”区分对象</h2>
+  <div class="card">
+    <p>对象联合的成员拥有不同属性时，可用 <code>"prop" in obj</code> 检查属性是否存在。TypeScript 会把对象收窄到可能拥有该属性的成员。</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">EmailContact</span> = {
+  email: <span class="tok-type">string</span>;
+  sendEmail: () =&gt; <span class="tok-type">void</span>;
+};
+
+<span class="tok-key">type</span> <span class="tok-type">SmsContact</span> = {
+  phone: <span class="tok-type">string</span>;
+  sendSms: () =&gt; <span class="tok-type">void</span>;
+};
+
+<span class="tok-key">function</span> notify(contact: <span class="tok-type">EmailContact</span> | <span class="tok-type">SmsContact</span>) {
+  <span class="tok-key">if</span> (<span class="tok-str">"email"</span> <span class="tok-key">in</span> contact) {
+    contact.sendEmail(); <span class="tok-com">// contact: EmailContact</span>
+  } <span class="tok-key">else</span> {
+    contact.sendSms();   <span class="tok-com">// contact: SmsContact</span>
+  }
+}</code></pre>
+    <p><code>in</code> 右侧必须是对象。如果联合里还包含 <code>null</code> 或基本类型，要先用相等检查或 <code>typeof</code> 把它们排除。</p>
+  </div>
+
+  <div class="card">
+    <h3>可选属性会出现在两边</h3>
+    <p>如果某个成员的属性是可选的，它既可能通过 <code>in</code> 检查，也可能不通过，因此不能被简单地放进某一边：</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Fish</span> = { swim: () =&gt; <span class="tok-type">void</span> };
+<span class="tok-key">type</span> <span class="tok-type">Bird</span> = { fly: () =&gt; <span class="tok-type">void</span> };
+<span class="tok-key">type</span> <span class="tok-type">Human</span> = { swim?: () =&gt; <span class="tok-type">void</span>; fly?: () =&gt; <span class="tok-type">void</span> };
+
+<span class="tok-key">function</span> move(animal: <span class="tok-type">Fish</span> | <span class="tok-type">Bird</span> | <span class="tok-type">Human</span>) {
+  <span class="tok-key">if</span> (<span class="tok-str">"swim"</span> <span class="tok-key">in</span> animal) {
+    animal; <span class="tok-com">// Fish | Human</span>
+  } <span class="tok-key">else</span> {
+    animal; <span class="tok-com">// Bird | Human</span>
+  }
+}</code></pre>
+    <p>另外，JavaScript 的 <code>in</code> 也会检查原型链。它适合区分已知对象联合，但不要把它误当作完整的外部数据校验。</p>
+  </div>
+
+  <!-- ============ 6 ============ -->
+  <h2>6 · instanceof：按“由哪个类创建”来收窄</h2>
+  <div class="card">
+    <p><code>value instanceof Constructor</code> 会在运行时检查对象的原型链。TypeScript 因而能把值收窄为该类的实例。</p>
+    <pre><code><span class="tok-key">function</span> formatDate(value: <span class="tok-type">Date</span> | <span class="tok-type">string</span>): <span class="tok-type">string</span> {
+  <span class="tok-key">if</span> (value <span class="tok-key">instanceof</span> Date) {
+    <span class="tok-key">return</span> value.toISOString(); <span class="tok-com">// value: Date</span>
+  }
+  <span class="tok-key">return</span> value.trim();          <span class="tok-com">// value: string</span>
+}</code></pre>
+    <p>它尤其适合 <code>Date</code>、<code>Error</code>、DOM 类以及你自己定义的 <code>class</code>。与 <code>typeof</code> 相比，<code>instanceof</code> 能区分不同种类的对象。</p>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ③：interface 不能放在 instanceof 右边</h3>
+    <p><code>interface</code> 和 <code>type</code> 只存在于类型检查阶段，编译后会被擦除；<code>instanceof</code> 却需要一个运行时真实存在的构造函数。</p>
+    <pre><code><span class="tok-key">interface</span> <span class="tok-type">User</span> { name: <span class="tok-type">string</span> }
+
+<span class="tok-com">// value instanceof User</span>
+<span class="tok-com">//                  ❌ </span><span class="tok-err">User 只表示类型，运行时没有这个值</span>
+
+<span class="tok-key">class</span> <span class="tok-type">Member</span> {
+  <span class="tok-key">constructor</span>(<span class="tok-key">public</span> name: <span class="tok-type">string</span>) {}
+}
+
+<span class="tok-key">if</span> (value <span class="tok-key">instanceof</span> Member) {
+  value.name; <span class="tok-com">// ✅ value: Member</span>
+}</code></pre>
+  </div>
+
+  <!-- ============ 7 ============ -->
+  <h2>7 · 重点：可辨识联合 Discriminated Unions</h2>
+  <div class="card">
+    <p>当联合的每个对象成员都有一个<strong>相同字段名</strong>，而该字段分别是<strong>不同的字面量类型</strong>时，这个字段就叫<strong>判别字段（discriminant）</strong>，整个联合叫<strong>可辨识联合（discriminated union）</strong>。</p>
+    <p>最常用的字段名是 <code>kind</code>、<code>type</code> 或 <code>status</code>。它不是 TypeScript 的特殊语法，只是一种让数据结构主动携带“我是哪一种”的设计。</p>
+  </div>
+
+  <div class="card">
+    <h3>完整例子：Shape = Circle | Square</h3>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Circle</span> = {
+  kind: <span class="tok-str">"circle"</span>;
+  radius: <span class="tok-type">number</span>;
+};
+
+<span class="tok-key">type</span> <span class="tok-type">Square</span> = {
+  kind: <span class="tok-str">"square"</span>;
+  sideLength: <span class="tok-type">number</span>;
+};
+
+<span class="tok-key">type</span> <span class="tok-type">Shape</span> = <span class="tok-type">Circle</span> | <span class="tok-type">Square</span>;
+
+<span class="tok-key">function</span> area(shape: <span class="tok-type">Shape</span>): <span class="tok-type">number</span> {
+  <span class="tok-key">switch</span> (shape.kind) {
+    <span class="tok-key">case</span> <span class="tok-str">"circle"</span>:
+      <span class="tok-com">// shape: Circle，radius 一定存在</span>
+      <span class="tok-key">return</span> Math.PI * shape.radius ** 2;
+
+    <span class="tok-key">case</span> <span class="tok-str">"square"</span>:
+      <span class="tok-com">// shape: Square，sideLength 一定存在</span>
+      <span class="tok-key">return</span> shape.sideLength ** 2;
+  }
+}</code></pre>
+    <p>编译器看到 <code>case "circle"</code>，就知道 <code>shape.kind</code> 只能来自 <code>Circle</code>，因此可以安全读取 <code>radius</code>；另一个分支同理。</p>
+    <table>
+      <tr><th>设计要件</th><th>Shape 中的体现</th><th>作用</th></tr>
+      <tr><td>统一字段名</td><td>两个成员都有 <code>kind</code></td><td>提供统一判断入口</td></tr>
+      <tr><td>互不相同的字面量</td><td><code>"circle"</code> / <code>"square"</code></td><td>一对一识别成员</td></tr>
+      <tr><td>成员专属数据</td><td><code>radius</code> / <code>sideLength</code></td><td>收窄后安全访问</td></tr>
+    </table>
+  </div>
+
+  <div class="card warn">
+    <h3>为什么不要把所有字段都做成可选？</h3>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">BadShape</span> = {
+  kind: <span class="tok-str">"circle"</span> | <span class="tok-str">"square"</span>;
+  radius?: <span class="tok-type">number</span>;
+  sideLength?: <span class="tok-type">number</span>;
+};
+
+<span class="tok-key">const</span> broken: <span class="tok-type">BadShape</span> = {
+  kind: <span class="tok-str">"circle"</span>,
+  sideLength: 10 <span class="tok-com">// 居然合法：kind 与数据不一致</span>
+};</code></pre>
+    <p>可选字段模型没有表达“<code>circle</code> 必须配 <code>radius</code>”这条约束。可辨识联合把每种状态拆成独立成员，能让<strong>不可能的状态无法构造</strong>，而不只是在读取时少报一个错。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="c"
+       data-ok="正确！共同字段 kind 的不同字面量值，让每个 case 都能唯一对应一个成员。"
+       data-bad="想想编译器如何仅凭一个字段，就唯一确认 shape 是 Circle 还是 Square。">
+    <div class="q">Q2：在 <code>Shape = Circle | Square</code> 中，哪个设计使 <code>switch</code> 能准确收窄？</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">所有成员都把专属字段写成可选</button>
+      <button class="quiz-option" data-value="b">给两个成员完全相同的 <code>kind: string</code></button>
+      <button class="quiz-option" data-value="c">共同的 <code>kind</code> 字段使用不同字面量类型</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 8 ============ -->
+  <h2>8 · never 与穷尽检查：新增成员时别漏处理</h2>
+  <div class="card">
+    <p>当 <code>switch</code> 已排除联合里的每个成员，剩余值应当“不可能存在”。TypeScript 用 <code>never</code> 表示这种不可能类型。我们可以写一个 <code>assertNever</code>，让编译器替我们检查分支是否穷尽（exhaustiveness check）：</p>
+    <pre><code><span class="tok-key">function</span> assertNever(value: <span class="tok-type">never</span>): <span class="tok-type">never</span> {
+  <span class="tok-key">throw new</span> Error(<span class="tok-str">`未处理的形状：${JSON.stringify(value)}`</span>);
+}
+
+<span class="tok-key">function</span> area(shape: <span class="tok-type">Shape</span>): <span class="tok-type">number</span> {
+  <span class="tok-key">switch</span> (shape.kind) {
+    <span class="tok-key">case</span> <span class="tok-str">"circle"</span>:
+      <span class="tok-key">return</span> Math.PI * shape.radius ** 2;
+    <span class="tok-key">case</span> <span class="tok-str">"square"</span>:
+      <span class="tok-key">return</span> shape.sideLength ** 2;
+    <span class="tok-key">default</span>:
+      <span class="tok-key">return</span> assertNever(shape); <span class="tok-com">// shape 应当是 never</span>
+  }
+}</code></pre>
+  </div>
+
+  <div class="card">
+    <h3>它如何在需求变化时保护你？</h3>
+    <p>以后给联合新增 <code>Triangle</code>，却忘了给 <code>area</code> 增加分支：</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Triangle</span> = {
+  kind: <span class="tok-str">"triangle"</span>;
+  base: <span class="tok-type">number</span>;
+  height: <span class="tok-type">number</span>;
+};
+
+<span class="tok-key">type</span> <span class="tok-type">Shape</span> = <span class="tok-type">Circle</span> | <span class="tok-type">Square</span> | <span class="tok-type">Triangle</span>;
+<span class="tok-com">// assertNever(shape) 处报错：</span>
+<span class="tok-com">// ❌ </span><span class="tok-err">Triangle 不能传给 never</span></code></pre>
+    <p>这个错误正是在提醒：“你漏处理了 <code>triangle</code>。”<code>never</code> 本身会在 0007 深入学习；本课先记住它在可辨识联合中的一个实用角色：<strong>把未来新增成员造成的遗漏变成编译错误</strong>。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="a"
+       data-ok="正确！新增成员未被 case 排除，default 中就不再是 never，assertNever 会报错。"
+       data-bad="assertNever 的参数只能接收不可能出现的 never；新增成员后，剩余值还不可能吗？">
+    <div class="q">Q3：给 <code>Shape</code> 新增 <code>Triangle</code>，却没新增 <code>case</code>，<code>assertNever(shape)</code> 为什么会报错？</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a"><code>shape</code> 仍可能是 <code>Triangle</code>，不再是 <code>never</code></button>
+      <button class="quiz-option" data-value="b"><code>switch</code> 不能处理三个以上成员</button>
+      <button class="quiz-option" data-value="c"><code>never</code> 只能用于字符串</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 9 ============ -->
+  <h2>9 · 动手 A：读出分支里的类型</h2>
+  <p>别只看语法，要练习站在编译器的视角，把不可能的联合成员逐个划掉。</p>
+
+  <div class="card">
+    <p>① 分支内的 <code>value</code> 是什么类型？填一个类型词。</p>
+    <pre><code><span class="tok-key">function</span> clean(value: <span class="tok-type">string</span> | <span class="tok-type">number</span>) {
+  <span class="tok-key">if</span> (<span class="tok-key">typeof</span> value === <span class="tok-str">"string"</span>) {
+    value; <span class="tok-com">// 类型是？</span>
+  }
+}</code></pre>
+    <div class="type-check" data-widget="type-check" data-answers="string"
+         data-ok="对！typeof 守卫已经排除了 number，此处 value 是 string。"
+         data-bad="提示：条件明确问 value 是否为哪一种 typeof 结果？">
+      <input placeholder="类型…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p>② <code>case "square"</code> 内的 <code>shape</code> 是哪个成员类型？</p>
+    <pre><code><span class="tok-key">switch</span> (shape.kind) {
+  <span class="tok-key">case</span> <span class="tok-str">"square"</span>:
+    shape; <span class="tok-com">// 类型是？</span>
+}</code></pre>
+    <div class="type-check" data-widget="type-check" data-answers="Square|square"
+         data-ok="对！kind 的字面量值 square 唯一对应 Square。"
+         data-bad="提示：回看 Shape 联合中，哪个成员声明了 kind: &quot;square&quot;？">
+      <input placeholder="成员类型…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p>③ 下面分支中 <code>value</code> 的精确类型是什么？只填保留下来的字符串字面量，不要加引号。</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Value</span> = <span class="tok-str">"ready"</span> | <span class="tok-str">""</span> | <span class="tok-key">null</span> | <span class="tok-key">undefined</span>;
+
+<span class="tok-key">if</span> (value) {
+  value; <span class="tok-com">// 类型是？</span>
+}</code></pre>
+    <div class="type-check" data-widget="type-check" data-answers="ready|&quot;ready&quot;|'ready'"
+         data-ok="对！空字符串、null、undefined 都是假值，只剩字面量 ready。"
+         data-bad="提示：把联合中的假值逐个划掉，还剩哪一项？">
+      <input placeholder="字面量…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 10 ============ -->
+  <h2>10 · 动手 B：组合守卫与提前返回</h2>
+  <div class="card">
+    <p>真实代码常会组合多次收窄。读下面例子，观察每次 <code>return</code> 如何永久排除一条路径：</p>
+    <pre><code><span class="tok-key">function</span> normalize(input: <span class="tok-type">string</span> | <span class="tok-type">number</span> | <span class="tok-key">null</span>): <span class="tok-type">string</span> {
+  <span class="tok-key">if</span> (input === <span class="tok-key">null</span>) {
+    <span class="tok-key">return</span> <span class="tok-str">"—"</span>;
+  }
+  <span class="tok-com">// input: string | number</span>
+
+  <span class="tok-key">if</span> (<span class="tok-key">typeof</span> input === <span class="tok-str">"number"</span>) {
+    <span class="tok-key">return</span> input.toFixed(2);
+  }
+  <span class="tok-com">// input: string</span>
+
+  <span class="tok-key">return</span> input.trim();
+}</code></pre>
+    <p>这种“先处理特殊情况并返回”的写法叫<strong>提前返回（early return）</strong>。它减少嵌套，也让剩余路径的类型自然变窄。</p>
+  </div>
+
+  <div class="card">
+    <h3>请补出最小守卫</h3>
+    <p>下面代码要保留合法分数 <code>0</code>，只在没有分数时提前返回。条件中应填写什么？</p>
+    <pre><code><span class="tok-key">function</span> printScore(score: <span class="tok-type">number</span> | <span class="tok-key">null</span>) {
+  <span class="tok-key">if</span> (________________) {
+    <span class="tok-key">return</span> <span class="tok-str">"暂无分数"</span>;
+  }
+  <span class="tok-key">return</span> score.toFixed(0); <span class="tok-com">// score: number，0 也能到这里</span>
+}</code></pre>
+    <div class="type-check" data-widget="type-check" data-answers="score === null|score===null|null === score|null===score"
+         data-ok="对！明确检查 null 不会误伤合法的 0，返回后 score 就是 number。"
+         data-bad="提示：不要用 !score；要与唯一表示“没有分数”的值做严格相等比较。">
+      <input placeholder="条件表达式…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 11 ============ -->
+  <h2>11 · 如何选择守卫：从你真正想问的问题出发</h2>
+  <div class="card">
+    <table>
+      <tr><th>你想知道什么？</th><th>优先选择</th><th>典型形式</th></tr>
+      <tr><td>是哪一种基本类型？</td><td><code>typeof</code></td><td><code>typeof x === "string"</code></td></tr>
+      <tr><td>所有假值都可视为“没有”？</td><td>真值收窄</td><td><code>if (x)</code></td></tr>
+      <tr><td>是否等于某个状态或空值？</td><td>相等收窄</td><td><code>x === null</code>、<code>x !== "stop"</code></td></tr>
+      <tr><td>对象是否拥有区分性属性？</td><td><code>in</code></td><td><code>"email" in contact</code></td></tr>
+      <tr><td>是否由某个运行时类创建？</td><td><code>instanceof</code></td><td><code>x instanceof Date</code></td></tr>
+      <tr><td>业务对象属于哪个封闭变体？</td><td>可辨识联合</td><td><code>switch (x.kind)</code></td></tr>
+    </table>
+    <p><strong>最重要的判断：</strong>守卫既要让编译器满意，也要与业务语义一致。若 <code>0</code> 是合法分数，就不要用真值检查；若对象本来就是你设计的封闭状态集合，就优先加入判别字段，而不是到处猜测有哪些属性。</p>
+  </div>
+
+  <!-- ============ 下一步 ============ -->
+  <h2>12 · 小结与下一步</h2>
+  <div class="card">
+    <ul class="checklist">
+      <li>✅ 你现在能：解释为什么联合类型必须先收窄，并读懂控制流分析如何排除不可能成员。</li>
+      <li>✅ 你会选择 <code>typeof</code>、真值、相等、<code>in</code>、<code>instanceof</code> 五类守卫，并避开 <code>typeof null === "object"</code> 与误伤 <code>0</code>/<code>""</code> 的坑。</li>
+      <li>✅ 你能用字面量 <code>kind</code> 设计可辨识联合、用 <code>switch</code> 安全读取成员专属字段，并用 <code>assertNever</code> 做穷尽检查。</li>
+      <li>📖 权威阅读：<a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html">官方 Handbook · Narrowing</a>。</li>
+      <li>🛠 动手：去 <a href="https://www.typescriptlang.org/play">Playground</a> 逐段粘贴本课代码，悬停观察每个分支里的类型；再给 <code>Shape</code> 新增 <code>Triangle</code>，亲眼看 <code>assertNever</code> 报错。</li>
+      <li>➡️ <a href="0004-object-types.html">下一课 0004</a>：对象类型——系统学习属性、可选属性、只读属性，以及对象结构如何描述。</li>
+    </ul>
+    <p class="tip"><strong>卡住就问我</strong>——告诉我是哪一个分支的类型与你预期不同，我可以带你逐项划掉联合成员，或再出一组收窄练习。</p>
+  </div>
+
+  <div class="footer">
+    TypeScript 课程 · 阶段一 · 0003 ·
+    <a href="index.html">阶段目录</a> · <a href="0002-literal-and-union-types.html">上一课</a> · <a href="0004-object-types.html">下一课</a>
+  </div>
+
+  <script src="../assets/interactions.js"></script>
+</div>
+</body>
+</html>

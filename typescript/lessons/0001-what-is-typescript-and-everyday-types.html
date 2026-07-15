@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>0001 · TypeScript 本质、类型注解与推断</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<link rel="stylesheet" href="../assets/interactions.css" />
+</head>
+<body>
+<div class="container">
+  <nav class="lesson-nav">
+    <span class="badge ts">阶段一 · LESSON 0001</span>
+    <a href="index.html">📚 阶段目录</a>
+    <a href="../reference/everyday-types-cheatsheet.html">📄 速查表</a>
+    <a href="0002-literal-and-union-types.html">下一课 →</a>
+  </nav>
+
+  <h1>TypeScript 本质、类型注解与推断</h1>
+  <p class="lead">本课小胜利：能准确说出 TS 到底做了什么、写出各种基本类型注解、并<strong>判断编译器为你推断出的类型</strong>——这是后面所有课的地基。约 18 分钟。</p>
+
+  <!-- ============ 1 ============ -->
+  <h2>1 · TS 到底是什么：一个静态类型检查器</h2>
+  <div class="card">
+    <p>TypeScript 官方对自己的定义是:<em>“a static typechecker for JavaScript programs — a tool that runs before your code runs.”</em>
+      拆开看三个关键词:</p>
+    <table>
+      <tr><th>词</th><th>含义</th></tr>
+      <tr><td><strong>static 静态</strong></td><td>在代码<strong>运行前</strong>分析,不需要真的执行</td></tr>
+      <tr><td><strong>typechecker 类型检查</strong></td><td>检查“值的类型”和“用法”是否匹配</td></tr>
+      <tr><td><strong>for JavaScript 面向 JS</strong></td><td>它是 JS 的<strong>超集</strong>:合法 JS 一定是合法 TS</td></tr>
+    </table>
+    <p>关键心智模型:<strong>类型在编译后会被完全擦除(type erasure)</strong>。TS 编译产物就是普通 JS,浏览器/Node 运行的是那份 JS,类型只在“写代码时”帮你。</p>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/typescript-from-scratch.html">TS for the New Programmer</a> ·
+      <a href="https://www.typescriptlang.org/docs/handbook/intro.html">The TypeScript Handbook</a>。</p>
+  </div>
+
+  <div class="card">
+    <h3>为什么值得学:一个 JS 里“静默出错”的例子</h3>
+    <pre><code><span class="tok-com">// —— 纯 JavaScript,完全合法,不报错 ——</span>
+<span class="tok-key">function</span> total(items) {
+  <span class="tok-key">return</span> items.reduce((sum, x) =&gt; sum + x.price, 0);
+}
+total({ price: 10 }); <span class="tok-com">// 期望传数组,却传了对象 → 运行时才炸,或悄悄算错</span></code></pre>
+    <p>同样的代码加上类型后,<strong>写代码的当下</strong>编辑器就会画红线:</p>
+    <pre><code><span class="tok-key">function</span> total(items: { price: <span class="tok-type">number</span> }[]): <span class="tok-type">number</span> {
+  <span class="tok-key">return</span> items.reduce((sum, x) =&gt; sum + x.price, 0);
+}
+total({ price: 10 }); <span class="tok-com">// ❌ </span><span class="tok-err">对象不能赋给数组</span></code></pre>
+    <p>这就是核心价值:<strong>把“运行时才发现的 bug”提前到“敲代码时发现”</strong>。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="c"
+       data-ok="正确!类型在编译时被擦除,运行的是纯 JS,类型不参与运行。"
+       data-bad="回看‘type erasure’:运行时还剩下类型信息吗?">
+    <div class="q">Q1:一段 TS 编译成 JS 并运行时,类型注解发生了什么?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">被转成运行时检查代码,拖慢程序</button>
+      <button class="quiz-option" data-value="b">保留在 JS 里,浏览器会读取</button>
+      <button class="quiz-option" data-value="c">被完全擦除,运行的是纯 JS</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 2 ============ -->
+  <h2>2 · 类型注解的写法:变量、函数</h2>
+  <div class="card">
+    <p>注解的通用形状是 <code>标识符: 类型</code>。三种基本类型 <code>string / number / boolean</code>:</p>
+    <pre><code><span class="tok-key">let</span> name: <span class="tok-type">string</span> = <span class="tok-str">"Ada"</span>;
+<span class="tok-key">let</span> age: <span class="tok-type">number</span> = 30;      <span class="tok-com">// 整数、小数、bigint 都算 number 家族</span>
+<span class="tok-key">let</span> active: <span class="tok-type">boolean</span> = <span class="tok-key">true</span>;</code></pre>
+    <p>函数在<strong>参数</strong>和<strong>返回值</strong>两处标注:</p>
+    <pre><code><span class="tok-key">function</span> add(a: <span class="tok-type">number</span>, b: <span class="tok-type">number</span>): <span class="tok-type">number</span> {
+  <span class="tok-key">return</span> a + b;
+}
+<span class="tok-key">const</span> greet = (who: <span class="tok-type">string</span>): <span class="tok-type">string</span> =&gt; <span class="tok-str">`Hi ${who}`</span>;  <span class="tok-com">// 箭头函数同理</span></code></pre>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ①:隐式 any</h3>
+    <p>函数参数<strong>不写类型</strong>时,若开启了 <code>strict</code>,TS 会报 <em>“Parameter implicitly has an 'any' type”</em>。
+      因为 TS 无法从外部推断参数类型——<strong>参数必须显式标注</strong>。</p>
+    <pre><code><span class="tok-key">function</span> shout(msg) {          <span class="tok-com">// ❌ </span><span class="tok-err">msg 隐式为 any</span>
+  <span class="tok-key">return</span> msg.toUpperCase();
+}</code></pre>
+  </div>
+
+  <!-- ============ 3 ============ -->
+  <h2>3 · 类型推断 Inference:少写却仍安全</h2>
+  <div class="card">
+    <p>当变量<strong>声明即初始化</strong>时,TS 自动推断类型,你不必手写:</p>
+    <pre><code><span class="tok-key">let</span> total = 42;        <span class="tok-com">// 推断: number</span>
+<span class="tok-key">const</span> pi = 3.14;        <span class="tok-com">// 推断: 3.14 (字面量类型!const 更窄,见 0002)</span>
+<span class="tok-key">let</span> names = [<span class="tok-str">"a"</span>, <span class="tok-str">"b"</span>]; <span class="tok-com">// 推断: string[]</span>
+total = <span class="tok-str">"x"</span>;             <span class="tok-com">// ❌ </span><span class="tok-err">string 不能赋给 number</span></code></pre>
+    <p><code>let</code> 与 <code>const</code> 的推断不同:<code>const</code> 值不会变,所以被推断成更精确的<strong>字面量类型</strong>(下一课展开)。</p>
+    <p class="tip"><strong>经验法则</strong>:
+      变量能推断就<strong>别</strong>手写(减少噪音);
+      函数参数<strong>必须</strong>写;
+      函数返回值通常可省,但<strong>对外 API 建议显式写</strong>以锁定契约。
+      来源:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">Everyday Types</a>。</p>
+  </div>
+
+  <!-- 推断判读练习:锻炼“读出编译器脑中的类型” -->
+  <h2>4 · 动手 A:读出推断类型</h2>
+  <p>这是核心技能——看一行代码,说出 TS 推断出的类型。填<strong>类型词</strong>(如 <code>number</code>、<code>string[]</code>)。</p>
+
+  <div class="card">
+    <p>① <code>let count = 0;</code> 中 <code>count</code> 的类型是?</p>
+    <div class="type-check" data-widget="type-check" data-answers="number"
+         data-ok="对!数字字面量推断为 number。" data-bad="提示:0 是哪种基本类型?">
+      <input placeholder="类型…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+  <div class="card">
+    <p>② <code>let tags = ["ts", "js"];</code> 中 <code>tags</code> 的类型是?(写成 <code>类型[]</code> 形式)</p>
+    <div class="type-check" data-widget="type-check" data-answers="string[]|Array&lt;string&gt;|array<string>|string []"
+         data-ok="对!字符串数组推断为 string[]。" data-bad="提示:一个装 string 的数组,写作 ____[]。">
+      <input placeholder="类型…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- 修错练习:更贴近真实工作 -->
+  <h2>5 · 动手 B:修复类型报错</h2>
+  <div class="card">
+    <p>下面函数有一处会被 TS 标红。<strong>问题出在哪个参数的类型?</strong>填该参数<strong>应有的类型词</strong>:</p>
+    <pre><code><span class="tok-key">function</span> repeat(text: <span class="tok-type">string</span>, times: <span class="tok-type">string</span>): <span class="tok-type">string</span> {
+  <span class="tok-key">return</span> text.repeat(times); <span class="tok-com">// ❌ repeat() 需要 </span><span class="tok-err">number</span>
+}</code></pre>
+    <p>把 <code>times</code> 改成什么类型才正确?</p>
+    <div class="type-check" data-widget="type-check" data-answers="number"
+         data-ok="对!repeat(n) 需要 number,所以 times 应为 number。"
+         data-bad="提示:String.prototype.repeat 接收的参数是几?">
+      <input placeholder="类型…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="b"
+       data-ok="正确!参数无法从外部推断,必须显式标注,否则(strict 下)报隐式 any。"
+       data-bad="回看第 2、3 节:哪个位置 TS 推断不出来、必须你来写?">
+    <div class="q">Q2:以下哪个位置<strong>必须</strong>手写类型,否则可能变成隐式 any?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">const price = 9.9 里的 price</button>
+      <button class="quiz-option" data-value="b">函数参数,如 function f(x) 里的 x</button>
+      <button class="quiz-option" data-value="c">let list = [1,2,3] 里的 list</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 6 ============ -->
+  <h2>6 · 跑起来:编译流程 & strict</h2>
+  <div class="card">
+    <p>最小心智模型(细节留到阶段四):</p>
+    <pre><code><span class="tok-com"># 安装(项目内)</span>
+npm i -D typescript
+<span class="tok-com"># 一份最小配置</span>
+npx tsc --init
+<span class="tok-com"># 编译:app.ts → app.js</span>
+npx tsc</code></pre>
+    <p><code>tsconfig.json</code> 里最重要的一项是 <code>"strict": true</code>——它打开一组严格检查(含“禁止隐式 any”“空值检查”)。
+      <strong>本课程所有示例都假设 strict 开启</strong>,这也是业界默认。</p>
+    <p class="tip">不想装环境?用官方 <a href="https://www.typescriptlang.org/play">Playground</a>,浏览器里即时编译、看推断(把鼠标悬停到变量上会显示类型!)。</p>
+  </div>
+
+  <!-- ============ 下一步 ============ -->
+  <h2>7 · 小结与下一步</h2>
+  <div class="card">
+    <ul class="checklist">
+      <li>✅ 你现在能:解释 static/erasure、写基本注解、读出推断类型、修隐式 any。</li>
+      <li>📖 主要阅读(权威来源):<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">官方 Handbook · Everyday Types</a>。</li>
+      <li>🛠 动手:去 <a href="https://www.typescriptlang.org/play">Playground</a>,把本课每段代码敲一遍,<strong>悬停变量看推断</strong>,再故意写错看红线。</li>
+      <li>➡️ <a href="0002-literal-and-union-types.html">下一课 0002</a>:字面量类型 + 联合类型 <code>|</code> + 类型别名——表达“只能是这几个值之一”。</li>
+    </ul>
+    <p class="tip"><strong>卡住就问我</strong>——我是你的老师,可就任意一点展开、换讲法、加练习。</p>
+  </div>
+
+  <div class="footer">
+    TypeScript 课程 · 阶段一 · 0001 ·
+    <a href="index.html">阶段目录</a> · <a href="../reference/everyday-types-cheatsheet.html">速查表</a> · <a href="../RESOURCES.md">资源</a>
+  </div>
+
+  <script src="../assets/interactions.js"></script>
+</div>
+</body>
+</html>

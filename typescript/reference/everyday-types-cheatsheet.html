@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TS 速查表 · 阶段一 类型系统基础</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<style>
+  @media print { body { background: #fff; color: #000; } .card { box-shadow: none; } }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <span class="badge ts">REFERENCE · 阶段一速查</span>
+  <h1>类型系统基础速查表 <span style="color:var(--muted);font-size:1rem;">Stage 1 Cheat Sheet</span></h1>
+  <p class="lead">阶段一(0001–0007)的压缩精华,随时回查。权威来源:
+    <a href="https://www.typescriptlang.org/docs/handbook/intro.html">官方 Handbook</a>。</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>基本类型 & 注解</h3>
+      <pre><code><span class="tok-key">let</span> s: <span class="tok-type">string</span> = <span class="tok-str">"a"</span>;
+<span class="tok-key">let</span> n: <span class="tok-type">number</span> = 1;
+<span class="tok-key">let</span> b: <span class="tok-type">boolean</span> = <span class="tok-key">true</span>;
+<span class="tok-key">function</span> f(x: <span class="tok-type">number</span>): <span class="tok-type">string</span> { <span class="tok-key">return</span> <span class="tok-str">""</span>; }</code></pre>
+    </div>
+
+    <div class="card">
+      <h3>推断 & 何时省略</h3>
+      <table>
+        <tr><th>位置</th><th>做法</th></tr>
+        <tr><td>初始化变量</td><td>省略,靠推断</td></tr>
+        <tr><td>函数参数</td><td><strong>必写</strong></td></tr>
+        <tr><td>对外 API 返回</td><td>建议显式</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>字面量 & 联合 & 别名</h3>
+      <pre><code><span class="tok-key">type</span> Dir = <span class="tok-str">"up"</span> | <span class="tok-str">"down"</span>;
+<span class="tok-key">let</span> id: <span class="tok-type">number</span> | <span class="tok-type">string</span>;
+<span class="tok-key">const</span> c = { x: 1 } <span class="tok-key">as const</span>; <span class="tok-com">// 锁字面量</span></code></pre>
+    </div>
+
+    <div class="card">
+      <h3>收窄 Narrowing</h3>
+      <pre><code><span class="tok-key">typeof</span> x === <span class="tok-str">"string"</span>
+<span class="tok-str">"prop"</span> <span class="tok-key">in</span> obj
+x <span class="tok-key">instanceof</span> Cls
+<span class="tok-com">// 可辨识联合: 用 kind 字段 + switch</span></code></pre>
+    </div>
+
+    <div class="card">
+      <h3>对象类型</h3>
+      <pre><code>{ name: <span class="tok-type">string</span>;      <span class="tok-com">// 必填</span>
+  nick?: <span class="tok-type">string</span>;     <span class="tok-com">// 可选</span>
+  <span class="tok-key">readonly</span> id: <span class="tok-type">number</span>; <span class="tok-com">// 只读</span>
+  [k: <span class="tok-type">string</span>]: <span class="tok-type">unknown</span>; <span class="tok-com">// 索引签名</span>
+}</code></pre>
+    </div>
+
+    <div class="card">
+      <h3>数组 / 元组 / 枚举</h3>
+      <pre><code><span class="tok-type">number</span>[]              <span class="tok-com">// 数组</span>
+<span class="tok-key">readonly</span> <span class="tok-type">number</span>[]     <span class="tok-com">// 只读数组</span>
+[<span class="tok-type">string</span>, <span class="tok-type">number</span>]     <span class="tok-com">// 元组</span>
+<span class="tok-key">type</span> R = <span class="tok-str">"r"</span>|<span class="tok-str">"g"</span>|<span class="tok-str">"b"</span>; <span class="tok-com">// 常优于 enum</span></code></pre>
+    </div>
+
+    <div class="card">
+      <h3>函数类型</h3>
+      <pre><code><span class="tok-key">type</span> Fn = (a: <span class="tok-type">string</span>) =&gt; <span class="tok-type">void</span>;
+(a: <span class="tok-type">number</span>, b?: <span class="tok-type">number</span>) =&gt; <span class="tok-type">number</span>
+(...xs: <span class="tok-type">number</span>[]) =&gt; <span class="tok-type">number</span> <span class="tok-com">// rest</span></code></pre>
+    </div>
+
+    <div class="card">
+      <h3>特殊类型 & 断言</h3>
+      <pre><code><span class="tok-type">any</span>     <span class="tok-com">// 关检查,避免</span>
+<span class="tok-type">unknown</span> <span class="tok-com">// 安全 any,用前收窄</span>
+<span class="tok-type">never</span>   <span class="tok-com">// 不可能/穷尽检查</span>
+x <span class="tok-key">as</span> <span class="tok-type">string</span>   <span class="tok-com">// 断言(非转换)</span>
+y!            <span class="tok-com">// 非空断言</span></code></pre>
+    </div>
+  </div>
+
+  <div class="footer">
+    对应课程:<a href="../lessons/index.html">阶段一目录 0001–0007</a> · 有疑问随时问我。
+  </div>
+</div>
+</body>
+</html>

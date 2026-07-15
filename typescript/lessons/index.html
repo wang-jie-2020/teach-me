@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TypeScript 课程 · 阶段一 目录</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<style>
+  .lesson-row { display:flex; align-items:baseline; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+  .lesson-row:last-child { border-bottom:none; }
+  .lesson-row .no { font-family: ui-monospace, monospace; color: var(--muted); min-width:3.2em; }
+  .lesson-row a { font-weight:600; }
+  .lesson-row .desc { color: var(--muted); font-size:.92rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <span class="badge ts">TypeScript 课程</span>
+  <h1>阶段一 · 类型系统基础</h1>
+  <p class="lead">目标:从“会一点 JS”到“能自信地读写 TS 类型”。7 节递进深度课,每节含多例子 + 交互练习 + 常见坑。
+    配套:<a href="../reference/everyday-types-cheatsheet.html">阶段速查表</a> · <a href="../RESOURCES.md">资源</a> · <a href="../MISSION.md">Mission</a>。</p>
+
+  <div class="card">
+    <div class="lesson-row"><span class="no">0001</span>
+      <div><a href="0001-what-is-typescript-and-everyday-types.html">TS 本质、类型注解与推断</a>
+        <div class="desc">static/type erasure、基本类型、读出推断类型、隐式 any</div></div></div>
+    <div class="lesson-row"><span class="no">0002</span>
+      <div><a href="0002-literal-and-union-types.html">字面量、联合类型与类型别名</a>
+        <div class="desc">literal types、union <code>|</code>、type 别名、as const</div></div></div>
+    <div class="lesson-row"><span class="no">0003</span>
+      <div><a href="0003-narrowing.html">类型收窄 Narrowing</a>
+        <div class="desc">typeof / in / instanceof、真值收窄、可辨识联合</div></div></div>
+    <div class="lesson-row"><span class="no">0004</span>
+      <div><a href="0004-object-types.html">对象类型深入</a>
+        <div class="desc">可选 <code>?</code>、readonly、索引签名、多余属性检查</div></div></div>
+    <div class="lesson-row"><span class="no">0005</span>
+      <div><a href="0005-arrays-tuples-enums.html">数组、元组与枚举</a>
+        <div class="desc">T[]、tuple、readonly 数组、enum vs 字面量 union</div></div></div>
+    <div class="lesson-row"><span class="no">0006</span>
+      <div><a href="0006-functions.html">函数类型深入</a>
+        <div class="desc">函数类型表达式、可选/默认/rest 参、重载、void</div></div></div>
+    <div class="lesson-row"><span class="no">0007</span>
+      <div><a href="0007-special-types-and-assertions.html">特殊类型、断言与综合复习</a>
+        <div class="desc">any/unknown/never、as 断言、跨主题综合练习</div></div></div>
+  </div>
+
+  <div class="card tip">
+    <strong>学习建议</strong>:按顺序学,每课先读讲解、做完所有交互练习,再去
+    <a href="https://www.typescriptlang.org/play">Playground</a> 亲手敲一遍。有任何不懂,直接问我——我是你的老师。
+  </div>
+
+  <div class="footer">阶段一 · 0001–0007 · 下一阶段(结构与泛型)将在你完成本阶段后开启。</div>
+</div>
+</body>
+</html>

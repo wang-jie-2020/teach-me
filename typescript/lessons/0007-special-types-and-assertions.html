@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>0007 · 特殊类型、类型断言与阶段综合复习</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<link rel="stylesheet" href="../assets/interactions.css" />
+</head>
+<body>
+<div class="container">
+  <nav class="lesson-nav">
+    <span class="badge ts">阶段一 · LESSON 0007</span>
+    <a href="index.html">📚 阶段目录</a>
+    <a href="../reference/everyday-types-cheatsheet.html">📄 速查表</a>
+    <a href="0006-functions.html">← 上一课</a>
+    <a href="index.html">阶段一完成,进入阶段二 →</a>
+  </nav>
+
+  <h1>特殊类型、类型断言与阶段综合复习</h1>
+  <p class="lead">本课小胜利:能区分 <code>any</code> / <code>unknown</code> / <code>never</code> / <code>void</code> 四个“边界类型”的差别、用 <code>as</code> 收窄类型而不被编译器骗到,并通过 3 个跨主题综合练习,把阶段一 0001-0006 的内容交织起来长期记忆。约 22 分钟。</p>
+
+  <!-- ============ 1 ============ -->
+  <h2>1 · <code>any</code>:关闭类型检查的逃生舱</h2>
+  <div class="card">
+    <p><code>any</code> 是 TS 类型系统的“万能插槽”——把所有类型检查关掉,让一个值可以被赋给任何变量、调用任何方法。
+      官方原话:<em>“If you don't want TypeScript to check a particular variable, you can use <code>any</code>.”</em>
+      (<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">Everyday Types</a>)</p>
+    <pre><code><span class="tok-key">let</span> x: <span class="tok-type">any</span>;
+
+x = <span class="tok-num">1</span>;
+x = <span class="tok-str">"hello"</span>;
+x.toUpperCase();   <span class="tok-com">// 编译过!运行时如果 x 是 1 → TypeError</span>
+x.foo.bar.baz;     <span class="tok-com">// 编译过!运行时大概率 undefined</span></code></pre>
+    <p>可以看到 <code>any</code> 实际上<strong>把你“退回到了纯 JS 模式”</strong>:编译器不再为你把关。</p>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ①:为什么尽量别用 <code>any</code></h3>
+    <p>每用一次 <code>any</code>,等于在你这一小片代码里<strong>关掉了 TS 的全部价值</strong>。
+      它会<strong>传染</strong>:从 <code>any</code> 出发访问到的成员默认也是 <code>any</code>,污染一片。
+      现实里几乎所有 <code>any</code> 都来自三类:</p>
+    <ul>
+      <li>① 第三方库没提供类型 → 改用 <code>unknown</code> + 收窄,或装 <code>@types/xxx</code>;</li>
+      <li>② 数据结构还没想清楚 → 先用 <code>unknown</code> 顶住,后面再精确化;</li>
+      <li>③ <code>strict: false</code> 偷偷漏出的隐式 <code>any</code> → 打开 strict 才是治本。</li>
+    </ul>
+    <p><strong>经验法则</strong>:<code>any</code> 只在“迁移老 JS、临时绕开类型 bug、且已加注释解释原因”时使用,否则默认禁止。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="b"
+       data-ok="正确!<code>any</code> 编译过、运行炸,正是它的危害。"
+       data-bad="回看上例:<code>any</code> 在编译期被检查吗?">
+    <div class="q">Q1:<code>let x: any = 1; x.toUpperCase();</code> 会发生什么?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">编译期就报错,提示 string 方法不能用在 number 上</button>
+      <button class="quiz-option" data-value="b">编译过、运行时报 TypeError: x.toUpperCase is not a function</button>
+      <button class="quiz-option" data-value="c">TS 自动把 1 转成 "1" 再调 toUpperCase</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 2 ============ -->
+  <h2>2 · <code>unknown</code>:安全的 <code>any</code></h2>
+  <div class="card">
+    <p><code>unknown</code> 表示“我也不知道这值是什么”,但它<strong>不会传染</strong>——必须先用类型守卫<strong>收窄</strong>(narrow)才能用。
+      这是 0004 narrowing 的直接应用。</p>
+    <pre><code><span class="tok-key">function</span> parse(input: <span class="tok-type">string</span>): <span class="tok-type">unknown</span> {
+  <span class="tok-key">return</span> <span class="tok-type">JSON</span>.parse(input);   <span class="tok-com">// 编译期不知道返回什么形状</span>
+}
+
+<span class="tok-key">const</span> data = parse(<span class="tok-str">'{"n":42}'</span>);
+<span class="tok-type">console</span>.log(data.n);          <span class="tok-com">// ❌ </span><span class="tok-err">Object is of type 'unknown'</span>
+
+<span class="tok-com">// 必须先收窄</span>
+<span class="tok-key">if</span> (data &amp;&amp; <span class="tok-key">typeof</span> data === <span class="tok-str">"object"</span> &amp;&amp; <span class="tok-str">"n"</span> <span class="tok-key">in</span> data) {
+  <span class="tok-type">console</span>.log((data <span class="tok-key">as</span> { n: <span class="tok-type">number</span> }).n); <span class="tok-com">// ✅</span>
+}</code></pre>
+    <p>对比 <code>any</code> vs <code>unknown</code>:</p>
+    <table>
+      <tr><th>维度</th><th><code>any</code></th><th><code>unknown</code></th></tr>
+      <tr><td>能赋给任何变量</td><td>✅ 能</td><td>✅ 能</td></tr>
+      <tr><td>能<strong>不检查</strong>直接访问属性</td><td>✅ 能(危险)</td><td>❌ 必须先收窄</td></tr>
+      <tr><td>传染性</td><td>会传染整片代码</td><td>不传染</td></tr>
+      <tr><td>何时用</td><td>几乎不用 / 临时逃生</td><td>“我不知道这是啥,我先顶住”</td></tr>
+    </table>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">Everyday Types</a>。</p>
+  </div>
+
+  <!-- ============ 3 ============ -->
+  <h2>3 · <code>never</code>:不可能的类型 + 穷尽检查</h2>
+  <div class="card">
+    <p><code>never</code> 是“<strong>不可能</strong>的类型”——
+      没有任何值可以属于它。它出现在两个场景:</p>
+    <ol>
+      <li>① <strong>永不返回的函数</strong>:抛异常、<code>while(true){}</code>。调用方拿不到返回值。</li>
+      <li>② <strong>穷尽检查</strong>(exhaustiveness):把可辨识联合(0003)的所有分支都处理完后,剩余的“理论上不可能存在”的值类型就是 <code>never</code>。利用这一点写 <code>assertNever</code>。</li>
+    </ol>
+    <pre><code><span class="tok-key">function</span> fail(msg: <span class="tok-type">string</span>): <span class="tok-type">never</span> {
+  <span class="tok-key">throw</span> <span class="tok-key">new</span> <span class="tok-type">Error</span>(msg);
+}
+
+<span class="tok-com">// —— 经典的 assertNever:给 union 加一个穷尽检查保护 ——</span>
+<span class="tok-key">type</span> Shape =
+  | { kind: <span class="tok-str">"circle"</span>;  r: <span class="tok-type">number</span> }
+  | { kind: <span class="tok-str">"square"</span>;  s: <span class="tok-type">number</span> }
+  | { kind: <span class="tok-str">"triangle"</span>; base: <span class="tok-type">number</span>; h: <span class="tok-type">number</span> };
+
+<span class="tok-key">function</span> assertNever(x: <span class="tok-type">never</span>): <span class="tok-type">never</span> {
+  <span class="tok-key">throw</span> <span class="tok-key">new</span> <span class="tok-type">Error</span>(<span class="tok-str">"Unexpected: "</span> + <span class="tok-type">JSON</span>.stringify(x));
+}
+
+<span class="tok-key">function</span> area(s: Shape): <span class="tok-type">number</span> {
+  <span class="tok-key">switch</span> (s.kind) {
+    <span class="tok-key">case</span> <span class="tok-str">"circle"</span>:   <span class="tok-key">return</span> Math.PI * s.r ** <span class="tok-num">2</span>;
+    <span class="tok-key">case</span> <span class="tok-str">"square"</span>:   <span class="tok-key">return</span> s.s * s.s;
+    <span class="tok-key">case</span> <span class="tok-str">"triangle"</span>: <span class="tok-key">return</span> (s.base * s.h) / <span class="tok-num">2</span>;
+    <span class="tok-key">default</span>:       <span class="tok-key">return</span> assertNever(s); <span class="tok-com">// 加新分支没处理时这里报错</span>
+  }
+}</code></pre>
+    <p>如果以后给 <code>Shape</code> 加了 <code>{ kind: "trapezoid" }</code> 而忘了在 <code>switch</code> 里写对应 <code>case</code>,<code>assertNever(s)</code> 会立刻在编译期报错——把“漏处理分支”挡在运行之前。
+      思路呼应 0003 的可辨识联合,工具是 0004 的 narrowing 收窄到 <code>never</code>。
+      来源:<a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html">Narrowing</a>。</p>
+  </div>
+
+  <div class="card">
+    <h3>为什么 <code>never</code> 能在 <code>default</code> 出现?</h3>
+    <p>在 <code>switch</code> 把 <code>circle / square / triangle</code> 三个 <code>case</code> 都 <code>return</code> 之后,
+      TS 知道剩下能走到 <code>default</code> 的 <code>s</code> 必然不属于 <code>Shape</code>——这种“剩余类型”就是 <code>never</code>。
+      而 <code>assertNever</code> 的形参正好声明为 <code>never</code>,编译器顺势校验:确实传进来的是 <code>never</code>,代码合法;如果哪天漏掉一个分支,这里类型不再为 <code>never</code>,编译就报错。
+      <strong>这把“忘记处理分支”这种最常见的运行时 bug 前置成了编译错误。</strong></p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="c"
+       data-ok="正确!<code>assertNever(x: never)</code> 把“漏分支”变成编译错误。"
+       data-bad="回看 assertNever 例:<code>default</code> 分支能走到时 <code>s</code> 是什么类型?为什么编译器让你把它传给 <code>never</code> 形参?">
+    <div class="q">Q2:<code>assertNever</code> 的核心价值是?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">运行时报错,告诉用户输入不合法</button>
+      <button class="quiz-option" data-value="b">让函数返回 undefined 避免报错</button>
+      <button class="quiz-option" data-value="c">穷尽联合类型,未来加新分支忘了处理时编译报错</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 4 ============ -->
+  <h2>4 · <code>void</code> 与 <code>undefined</code>:别混淆</h2>
+  <div class="card">
+    <p>这是 0006 函数类型的延伸。一个返回 <code>void</code> 的函数表示“调用者不该关心返回值”,而返回 <code>undefined</code> 表示“<strong>真的</strong>返回了 undefined 这个值”。
+      来源:<a href="https://www.typescriptlang.org/docs/handbook/2/functions.html">Functions · void</a>。</p>
+    <pre><code><span class="tok-key">function</span> log(msg: <span class="tok-type">string</span>): <span class="tok-type">void</span> {
+  <span class="tok-type">console</span>.log(msg);
+  <span class="tok-com">// 没有 return,或 return;</span>
+}
+
+<span class="tok-key">function</span> makeNothing(): <span class="tok-type">undefined</span> {
+  <span class="tok-key">return</span> <span class="tok-key">undefined</span>;   <span class="tok-com">// 必须显式 return undefined</span>
+}
+
+<span class="tok-key">const</span> a = log(<span class="tok-str">"hi"</span>);        <span class="tok-com">// a: void</span>
+<span class="tok-key">const</span> b = makeNothing();    <span class="tok-com">// b: undefined</span></code></pre>
+    <p><strong>常见坑</strong>:把 <code>void</code> 当成“返回了 undefined”——技术上没错,但语义不同。
+      <code>void</code> 是给调用方看的契约:“别用我的返回值”;<code>undefined</code> 是具体的值。
+      在回调签名里最常区分二者:回调参数写 <code>() =&gt; void</code> 容忍实现里<strong>意外</strong>返回点什么(常见于链式 API)。</p>
+  </div>
+
+  <!-- ============ 5 ============ -->
+  <h2>5 · 类型断言 <code>as</code> 与 <code>as const</code>、非空断言 <code>!</code></h2>
+  <div class="card">
+    <p>类型断言(<em>type assertion</em>)是<strong>告诉编译器“你比我懂,相信我”</strong>的语法。
+      它<strong>不是类型转换</strong>——不会改运行时行为,只是让编译期把类型按你说的算。
+      来源:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">Everyday Types · Type Assertions</a>。</p>
+    <pre><code><span class="tok-key">const</span> el = <span class="tok-type">document</span>.getElementById(<span class="tok-str">"app"</span>) <span class="tok-key">as</span> <span class="tok-type">HTMLDivElement</span>;
+<span class="tok-com">// 运行时 el 仍然可能为 null;只是 TS 相信你,不再标红</span></code></pre>
+    <p class="warn"><strong>断言 ≠ 转换</strong>。下面这段<strong>编译过、运行炸</strong>:</p>
+    <pre><code><span class="tok-key">const</span> x = <span class="tok-str">"hello"</span> <span class="tok-key">as</span> <span class="tok-type">number</span>;
+<span class="tok-type">console</span>.log(x.toFixed(<span class="tok-num">2</span>));   <span class="tok-com">// ❌ 编译过,运行报 x.toFixed is not a function</span></code></pre>
+  </div>
+
+  <div class="card">
+    <h3><code>as const</code>:把字面量“冻”成最窄类型</h3>
+    <p>不加 <code>as const</code>,数组/对象的字面量会被推断成宽类型(如 <code>string[]</code>);加上后变字面量元组/只读对象(呼应 0002 的字面量类型):</p>
+    <pre><code><span class="tok-key">const</span> directions = [<span class="tok-str">"up"</span>, <span class="tok-str">"down"</span>, <span class="tok-str">"left"</span>, <span class="tok-str">"right"</span>];
+<span class="tok-com">// 推断:string[]</span>
+
+<span class="tok-key">const</span> dirs = [<span class="tok-str">"up"</span>, <span class="tok-str">"down"</span>] <span class="tok-key">as</span> <span class="tok-key">const</span>;
+<span class="tok-com">// 推断:readonly ["up", "down"]</span>
+
+<span class="tok-key">type</span> Dir = <span class="tok-key">typeof</span> dirs[number];  <span class="tok-com">// "up" | "down"</span></code></pre>
+    <p>这正是 0002 字面量 + 0003 union 的工厂组合:用 <code>as const</code> 收窄,再用 <code>typeof</code> 反推 union。</p>
+  </div>
+
+  <div class="card warn">
+    <h3>非空断言 <code>!</code>:对“一定不是 null”拍胸脯</h3>
+    <pre><code><span class="tok-key">const</span> el = <span class="tok-type">document</span>.getElementById(<span class="tok-str">"app"</span>)!;
+el.innerText = <span class="tok-str">"hi"</span>;   <span class="tok-com">// el 类型: HTMLElement(去掉了 null)</span></code></pre>
+    <p>和 <code>as</code> 一样,只是<strong>关闭编译期怀疑</strong>——运行时如果真的是 <code>null</code>,立刻炸。
+      <strong>经验法则</strong>:能用 narrowing(<code>if (el) ...</code>)就别用 <code>!</code>;只有 100% 确信(比如紧跟着 <code>document.body.appendChild</code> 才查询的同一元素)才用,并加注释。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="a"
+       data-ok="正确!断言不运行任何代码,只是关掉编译器的怀疑。"
+       data-bad="回看:断言是“告诉编译器”,还是“运行期改值的类型”?">
+    <div class="q">Q3:<code>"hello" as number</code> 之后,运行期 <code>x</code> 的实际值是?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">仍然是字符串 "hello",只是 TS 编译器“以为”是 number</button>
+      <button class="quiz-option" data-value="b">变成了 number 0</button>
+      <button class="quiz-option" data-value="c">变成了 NaN</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 6 ============ 综合练习 ============ -->
+  <h2>6 · 阶段综合 A:对象 + 联合 + narrowing(交错练习 1)</h2>
+  <p>把 0002(字面量)+ 0003(可辨识联合)+ 0004(narrowing)+ 0005(对象)串起来。</p>
+
+  <div class="card">
+    <p>下面有一个用户数据 API,会用“字符串里塞 JSON”的形式回传数据。请补全 <code>formatUser</code>,让它能根据 <code>role</code> 处理两种情况、并在 <code>default</code> 用 <code>assertNever</code>:</p>
+    <pre><code><span class="tok-key">type</span> User =
+  | { role: <span class="tok-str">"admin"</span>;  level: <span class="tok-num">1</span> | <span class="tok-num">2</span> | <span class="tok-num">3</span> }
+  | { role: <span class="tok-str">"guest"</span>;  expiresAt: <span class="tok-type">number</span> };
+
+<span class="tok-key">function</span> assertNever(x: <span class="tok-type">never</span>): <span class="tok-type">never</span> {
+  <span class="tok-key">throw</span> <span class="tok-key">new</span> <span class="tok-type">Error</span>(<span class="tok-str">"Unexpected: "</span> + <span class="tok-type">JSON</span>.stringify(x));
+}
+
+<span class="tok-key">function</span> formatUser(u: User): <span class="tok-type">string</span> {
+  <span class="tok-key">switch</span> (u.role) {
+    <span class="tok-key">case</span> <span class="tok-str">"admin"</span>: <span class="tok-key">return</span> <span class="tok-str">`A:Lv${u.level}`</span>;
+    <span class="tok-key">case</span> <span class="tok-str">"guest"</span>: <span class="tok-key">return</span> <span class="tok-str">`G:${u.expiresAt}`</span>;
+    <span class="tok-key">default</span>:     <span class="tok-key">return</span> assertNever(____);  <span class="tok-com">// ← 该传什么?</span>
+  }
+}</code></pre>
+    <p><code>default</code> 这一行的实参应该填?(把标识符名填到框里)</p>
+    <div class="type-check" data-widget="type-check" data-answers="u"
+         data-ok="对!把 u 传进去,编译器才知道你有没有漏 case。"
+         data-bad="提示:实参就是当前正在被 switch 的那个值。">
+      <input placeholder="标识符…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 7 ============ -->
+  <h2>7 · 阶段综合 B:<code>unknown</code> + 函数 + narrowing(交错练习 2)</h2>
+  <p>把 0001(基本类型)+ 0004(narrowing)+ 0006(函数)+ 本课 <code>unknown</code> 串起来。</p>
+
+  <div class="card">
+    <p>写一个 <code>safeGetNumber</code>,接收 <code>unknown</code>,只在“确实是数字”时返回它,否则返回 <code>0</code>。
+      下面哪一种写法正确?</p>
+    <div class="quiz" data-quiz="single-choice"
+         data-answer="a"
+         data-ok="正确!<code>typeof x === "number"</code> 把 <code>unknown</code> 收窄成 <code>number</code>。"
+         data-bad="回看 narrowing:<code>unknown</code> 在用之前要先做什么?">
+      <div class="q">Q4:正确实现是?</div>
+      <div class="quiz-grid">
+        <button class="quiz-option" data-value="a">
+<pre><code><span class="tok-key">function</span> safeGetNumber(x: <span class="tok-type">unknown</span>): <span class="tok-type">number</span> {
+  <span class="tok-key">return</span> <span class="tok-key">typeof</span> x === <span class="tok-str">"number"</span> ? x : <span class="tok-num">0</span>;
+}</code></pre>
+        </button>
+        <button class="quiz-option" data-value="b">
+<pre><code><span class="tok-key">function</span> safeGetNumber(x: <span class="tok-type">any</span>): <span class="tok-type">number</span> {
+  <span class="tok-key">return</span> x;
+}</code></pre>
+        </button>
+        <button class="quiz-option" data-value="c">
+<pre><code><span class="tok-key">function</span> safeGetNumber(x: <span class="tok-type">unknown</span>): <span class="tok-type">number</span> {
+  <span class="tok-key">return</span> x + <span class="tok-num">0</span>; <span class="tok-com">// 强制转</span>
+}</code></pre>
+        </button>
+      </div>
+      <div class="quiz-feedback"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p>升级版:<code>safeGetNumber</code> 现在要拒绝 <code>NaN</code>(虽然 <code>typeof NaN === "number"</code>)。
+      最干净的写法是 <code>Number.isFinite(x)</code>(0006 函数库 API 也行)。补全:</p>
+    <pre><code><span class="tok-key">function</span> safeGetNumber(x: <span class="tok-type">unknown</span>): <span class="tok-type">number</span> {
+  <span class="tok-key">return</span> <span class="tok-key">typeof</span> x === <span class="tok-str">"number"</span> &amp;&amp; ____ ? x : <span class="tok-num">0</span>;
+}</code></pre>
+    <p>填空(<code>Number.isFinite(x)</code> 这种表达式形式):</p>
+    <div class="type-check" data-widget="type-check" data-answers="Number.isFinite(x)|Number.isFinite(x )"
+         data-ok="对!先 typeof 收窄成 number,再 Number.isFinite 排除 NaN/Infinity。"
+         data-bad="提示:标准库里有现成的“有限数字”判断函数。">
+      <input placeholder="表达式…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 8 ============ -->
+  <h2>8 · 阶段综合 C:<code>as const</code> + union + 查表函数(交错练习 3)</h2>
+  <p>把 0002(字面量)+ 0003(union)+ 0005(对象表)+ 0006(函数返回)+ 本课 <code>as const</code> 串起来。</p>
+
+  <div class="card">
+    <p>下面有一个“语言 → 问候语”的查表函数。问题是 <code>GREETINGS</code> 没有用 <code>as const</code>,导致 <code>keyof typeof GREETINGS</code> 不是期望的字面量 union。</p>
+    <pre><code><span class="tok-key">const</span> GREETINGS = {
+  en: <span class="tok-str">"Hello"</span>,
+  ja: <span class="tok-str">"こんにちは"</span>,
+  zh: <span class="tok-str">"你好"</span>,
+};
+<span class="tok-key">type</span> Lang = <span class="tok-key">typeof</span> GREETINGS[keyof <span class="tok-key">typeof</span> GREETINGS];
+<span class="tok-com">// 当前 Lang 推断成:string(宽了,没区分能力)</span>
+
+<span class="tok-key">function</span> greet(lang: Lang): <span class="tok-type">string</span> {
+  <span class="tok-key">return</span> GREETINGS[lang];
+}
+
+greet(<span class="tok-str">"en"</span>); <span class="tok-com">// ❌ 实际报: "en" 不是 Lang,因为 Lang 是 string</span></code></pre>
+    <p>最小修改一行让 <code>Lang</code> 变成 <code>"Hello" | "こんにちは" | "你好"</code>?
+      填“加在 <code>GREETINGS</code> 后面的两个关键字”:</p>
+    <div class="type-check" data-widget="type-check" data-answers="as const"
+         data-ok="对!<code>as const</code> 把对象字面量冻成 readonly,所有 value 保留字面量类型。"
+         data-bad="提示:本课学过的、把字面量“冻”成最窄类型的关键字。">
+      <input placeholder="关键字…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+    <p class="tip">加上 <code>as const</code> 后,<code>typeof GREETINGS[keyof typeof GREETINGS]</code> 会按 union 求值,得到三种字面量值。这正是用“查表 + 字面量 + union”写出零开销、无 if/else 的纯查表函数的标准模式。</p>
+  </div>
+
+  <!-- ============ 9 ============ -->
+  <h2>9 · 阶段一总览 & 收官</h2>
+  <div class="card">
+    <table>
+      <tr><th>课</th><th>主题</th><th>关键武器</th></tr>
+      <tr><td>0001</td><td>本质与基本类型</td><td>注解、推断、<code>strict</code></td></tr>
+      <tr><td>0002</td><td>字面量 + union</td><td><code>"on" | "off"</code>、<code>as const</code></td></tr>
+      <tr><td>0003</td><td>可辨识联合</td><td><code>kind</code> 字段驱动 switch</td></tr>
+      <tr><td>0004</td><td>Narrowing</td><td><code>typeof / in / instanceof</code></td></tr>
+      <tr><td>0005</td><td>对象类型</td><td>可选 <code>?</code>、<code>readonly</code></td></tr>
+      <tr><td>0006</td><td>函数</td><td>参数/返回类型、可选/默认/重载</td></tr>
+      <tr><td><strong>0007</strong></td><td><strong>边界类型 + 断言</strong></td><td><strong>any / unknown / never / void + as</strong></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>四个边界类型速记</h3>
+    <ul>
+      <li><code>any</code>:关掉检查的逃生舱 —— <strong>尽量别用</strong>。</li>
+      <li><code>unknown</code>:安全的 any —— 用前必须 narrowing。</li>
+      <li><code>never</code>:不可能 —— 穷尽检查的 <code>assertNever</code>。</li>
+      <li><code>void</code>:别关心返回值 —— 和 <code>undefined</code> 不同。</li>
+    </ul>
+  </div>
+
+  <!-- ============ 10 ============ -->
+  <h2>10 · 小结、祝贺 & 进入阶段二</h2>
+  <div class="card">
+    <ul class="checklist">
+      <li>✅ 你现在能:区分 <code>any/unknown/never/void</code>、用 <code>as</code> / <code>as const</code> / <code>!</code> 并知道它们的代价、为可辨识联合写 <code>assertNever</code>。</li>
+      <li>📖 主要阅读(权威来源):
+        <a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html">Everyday Types · any / 断言 / non-null</a> ·
+        <a href="https://www.typescriptlang.org/docs/handbook/2/narrowing.html">Narrowing · never / 穷尽检查</a> ·
+        <a href="https://www.typescriptlang.org/docs/handbook/2/functions.html">Functions · void</a>。
+      </li>
+      <li>🛠 动手:去 <a href="https://www.typescriptlang.org/play">Playground</a> 把第 6、7、8 节的三段综合代码敲一遍,故意漏掉一个 <code>case</code>,看 <code>assertNever</code> 怎么替你报警。</li>
+      <li>🎉 <strong>阶段一完成!</strong>你已经掌握了 TS 类型系统的基础语言——下面进入<strong>阶段二:泛型与类型推导</strong>。
+        <a href="index.html">回到阶段目录</a>查看阶段二课程。</li>
+    </ul>
+    <p class="tip"><strong>卡住就问我</strong>——我是你的老师,可就任意一点展开、换讲法、加练习。<br>
+      <strong>完成阶段一,值得鼓个掌!</strong>从“类型是什么”到“用类型组合业务”,你已经跨过了最陡的一段上坡。</p>
+  </div>
+
+  <div class="footer">
+    TypeScript 课程 · 阶段一 · 0007 ·
+    <a href="index.html">阶段目录</a> · <a href="../reference/everyday-types-cheatsheet.html">速查表</a> · <a href="../RESOURCES.md">资源</a>
+  </div>
+
+  <script src="../assets/interactions.js"></script>
+</div>
+</body>
+</html>

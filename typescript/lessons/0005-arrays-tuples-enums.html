@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>0005 · 数组、元组与枚举</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<link rel="stylesheet" href="../assets/interactions.css" />
+</head>
+<body>
+<div class="container">
+  <nav class="lesson-nav">
+    <span class="badge ts">阶段一 · LESSON 0005</span>
+    <a href="index.html">📚 阶段目录</a>
+    <a href="../reference/everyday-types-cheatsheet.html">📄 速查表</a>
+    <a href="0004-object-types.html">← 上一课</a>
+    <a href="0006-functions.html">下一课 →</a>
+  </nav>
+
+  <h1>数组、元组与枚举</h1>
+  <p class="lead">本课小胜利:能熟练写出"装同一类东西的列表"(<code>数组</code>)、"位置和类型都固定的小结构"(<code>元组 tuple</code>),并理解 <code>enum 枚举</code> 与 <code>字面量联合类型</code> 的取舍——这是写"形状更复杂"代码的拐点。约 22 分钟。</p>
+
+  <!-- ============ 1 ============ -->
+  <h2>1 · 数组类型:两种写法完全等价</h2>
+  <div class="card">
+    <p>TypeScript 给"一组同类元素"提供了<strong>两种</strong>语法,<strong>完全等价</strong>,任选一种用就好(同一份代码里风格保持一致)。</p>
+    <pre><code><span class="tok-com">// 写法 A:元素类型后接方括号(更短,推荐)</span>
+<span class="tok-key">let</span> scores: <span class="tok-type">number</span>[] = [95, 87, 76];
+
+<span class="tok-com">// 写法 B:泛型 Array&lt;T&gt;(在复杂类型嵌套时更易读)</span>
+<span class="tok-key">let</span> names: <span class="tok-type">Array</span>&lt;<span class="tok-type">string</span>&gt; = [<span class="tok-str">"Ada"</span>, <span class="tok-str">"Bob"</span>];</code></pre>
+    <p>类型推断会自然给出数组类型——声明即初始化时,不必手写:</p>
+    <pre><code><span class="tok-key">let</span> tags = [<span class="tok-str">"ts"</span>, <span class="tok-str">"js"</span>];  <span class="tok-com">// 推断: string[]</span>
+<span class="tok-key">let</span> nums = [1, 2, 3];        <span class="tok-com">// 推断: number[]</span></code></pre>
+    <p>数组方法的参数和返回值也都被自动类型化:<code>tags.map(s =&gt; s.toUpperCase())</code> 里 <code>s</code> 就是 <code>string</code>。</p>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#arrays">Handbook · Arrays</a>。</p>
+  </div>
+
+  <!-- ============ 2 ============ -->
+  <h2>2 · 只读数组:承诺"我不改它"</h2>
+  <div class="card">
+    <p>当一个数组应当<strong>只读</strong>(例如配置项、来自外部的固定数据),用 <code>readonly</code> 修饰:</p>
+    <pre><code><span class="tok-key">function</span> total(items: <span class="tok-type">readonly</span> <span class="tok-type">number</span>[]): <span class="tok-type">number</span> {
+  <span class="tok-key">return</span> items.reduce((s, n) =&gt; s + n, 0);
+}
+total([1, 2, 3]);  <span class="tok-com">// ✅ 读可以</span>
+items.push(4);     <span class="tok-com">// ❌ </span><span class="tok-err">Property 'push' does not exist on type 'readonly number[]'</span></code></pre>
+    <p>同样有泛型写法:<code>ReadonlyArray&lt;T&gt;</code>,与 <code>readonly T[]</code> 等价。两者都<strong>不允许</strong> <code>push/pop/splice/sort/...</code> 等任何会改变长度或顺序的方法。</p>
+    <pre><code><span class="tok-key">const</span> ro: <span class="tok-type">ReadonlyArray</span>&lt;<span class="tok-type">string</span>&gt; = [<span class="tok-str">"a"</span>, <span class="tok-str">"b"</span>];
+ro[0] = <span class="tok-str">"x"</span>;   <span class="tok-com">// ❌ </span><span class="tok-err">下标写入也被禁</span>
+ro.forEach(s =&gt; console.log(s.toUpperCase()));  <span class="tok-com">// ✅ 读操作照常用</span></code></pre>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#arrays">Handbook · Arrays</a>(同节)。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="b"
+       data-ok="正确!readonly 数组在类型层禁止任何会修改数组的方法,编译时即报错。"
+       data-bad="回看:readonly 数组在编译后还有运行时代码吗?它只是类型层的承诺。">
+    <div class="q">Q1:把数组标成 <code>readonly number[]</code> 之后,运行时是否会真的把方法删掉?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">是,TS 会在编译产物里把这些方法移除</button>
+      <button class="quiz-option" data-value="b">不会,运行时仍是普通数组,只是类型层禁用了变更方法</button>
+      <button class="quiz-option" data-value="c">会在数组上加 Object.freeze</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 3 ============ -->
+  <h2>3 · 元组 tuple:长度固定、每位类型已知</h2>
+  <div class="card">
+    <p>数组表达"<strong>一堆同类</strong>",元组表达"<strong>一个固定形状的复合值</strong>"——典型场景:CSV 的一行、地图的 [经度, 纬度]、函数的 [状态码, 消息]。</p>
+    <pre><code><span class="tok-com">// [经度, 纬度] —— 类型、顺序、长度都已知</span>
+<span class="tok-key">let</span> coord: [<span class="tok-type">number</span>, <span class="tok-type">number</span>] = [121.47, 31.23];
+
+<span class="tok-com">// [状态码, 消息]</span>
+<span class="tok-key">type</span> <span class="tok-type">Result</span> = [<span class="tok-type">number</span>, <span class="tok-type">string</span>];
+<span class="tok-key">const</span> r: <span class="tok-type">Result</span> = [200, <span class="tok-str">"OK"</span>];</code></pre>
+    <p>解构时,每个位置自动得到<strong>那个位置的类型</strong>:</p>
+    <pre><code><span class="tok-key">const</span> [lng, lat] = coord;
+lng.toFixed(2);  <span class="tok-com">// ✅ number 的方法</span>
+lat.toUpperCase(); <span class="tok-com">// ❌ </span><span class="tok-err">number 上没有 toUpperCase</span></code></pre>
+  </div>
+
+  <div class="card">
+    <h3>3.1 可选元素与具名元素</h3>
+    <p>用 <code>?</code> 标记<strong>末尾</strong>可选:不写就少一位,写了就多位,中间不能空着。</p>
+    <pre><code><span class="tok-com">// RGB 或 RGBA</span>
+<span class="tok-key">type</span> <span class="tok-type">Color</span> = [<span class="tok-type">number</span>, <span class="tok-type">number</span>, <span class="tok-type">number</span>, <span class="tok-type">number</span>?];
+<span class="tok-key">const</span> c1: <span class="tok-type">Color</span> = [255, 0, 0];
+<span class="tok-key">const</span> c2: <span class="tok-type">Color</span> = [255, 0, 0, 0.5];
+<span class="tok-key">const</span> c3: <span class="tok-type">Color</span> = [255];   <span class="tok-com">// ❌ 长度不够</span></code></pre>
+    <p>从 TS 4.0 起,元组元素可以<strong>起名</strong>,只影响编辑器提示和可读性,不影响类型:</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Point</span> = [x: <span class="tok-type">number</span>, y: <span class="tok-type">number</span>];
+<span class="tok-key">const</span> p: <span class="tok-type">Point</span> = [10, 20];
+p[0];  <span class="tok-com">// 悬浮提示: (parameter) x: number</span></code></pre>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/objects.html#tuple-types">Handbook · Object Types · Tuple Types</a>。</p>
+  </div>
+
+  <!-- ============ 4 ============ -->
+  <h2>4 · rest 元组:开头固定 + 末尾可变长</h2>
+  <div class="card">
+    <p>当"至少一个,后面跟若干同类"时,用 <code>...T[]</code> 描述尾部:</p>
+    <pre><code><span class="tok-com">// 一个 string 后面跟任意个 number</span>
+<span class="tok-key">type</span> <span class="tok-type">Header</span> = [<span class="tok-type">string</span>, ...<span class="tok-type">number</span>[]];
+
+<span class="tok-key">const</span> a: <span class="tok-type">Header</span> = [<span class="tok-str">"scores"</span>, 95, 87, 76];
+<span class="tok-key">const</span> b: <span class="tok-type">Header</span> = [<span class="tok-str">"scores"</span>];          <span class="tok-com">// ✅ 末尾 rest 允许 0 个</span>
+<span class="tok-key">const</span> c: <span class="tok-type">Header</span> = [<span class="tok-str">"scores"</span>, <span class="tok-str">"x"</span>];  <span class="tok-com">// ❌ 第二位必须是 number</span></code></pre>
+    <p>典型用法——把 JS 的 <code>concat/arguments</code> 之类的不定参数包成精确类型。</p>
+  </div>
+
+  <!-- ============ 5 ============ -->
+  <h2>5 · <code>as const</code>:把数组/对象"凝固"成只读元组</h2>
+  <div class="card">
+    <p>回忆 0002 讲过的 <code>as const</code>:它把所有字段从"宽类型"(<code>string</code>、<code>number</code>)收窄成"字面量类型",并<strong>把数组变成只读元组</strong>。</p>
+    <pre><code><span class="tok-com">// 不加 as const: 推断为 string[]</span>
+<span class="tok-key">const</span> dirs = [<span class="tok-str">"up"</span>, <span class="tok-str">"down"</span>, <span class="tok-str">"left"</span>, <span class="tok-str">"right"</span>];
+
+<span class="tok-com">// 加 as const: 推断为 readonly ["up", "down", "left", "right"]</span>
+<span class="tok-key">const</span> dirs2 = [<span class="tok-str">"up"</span>, <span class="tok-str">"down"</span>, <span class="tok-str">"left"</span>, <span class="tok-str">"right"</span>] <span class="tok-key">as const</span>;</code></pre>
+    <p>这给你两件事:<strong>只读</strong> + <strong>每个位置都是字面量类型</strong>(可以让 <code>switch</code> 写得既精确又穷尽)。</p>
+    <p class="tip">承接 <a href="0002-literal-and-union-types.html">0002</a>;详见 <a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#literal-types">Handbook · Literal Types</a>。</p>
+  </div>
+
+  <div class="card">
+    <h3>动手 A:把"方向数组"变成"只读元组字面量"</h3>
+    <p>下面这段代码<strong>没有用</strong> <code>as const</code>,所以 <code>dirs</code> 被推断成 <code>string[]</code>,传给只接收字面量联合的函数会报错。请填入关键字让 <code>dirs</code> 拥有正确的"只读元组"类型。</p>
+    <pre><code><span class="tok-key">const</span> dirs = [<span class="tok-str">"up"</span>, <span class="tok-str">"down"</span>, <span class="tok-str">"left"</span>, <span class="tok-str">"right"</span>] <span class="tok-com">/* ? */</span>;
+
+<span class="tok-key">function</span> move(d: <span class="tok-str">"up"</span> | <span class="tok-str">"down"</span> | <span class="tok-str">"left"</span> | <span class="tok-str">"right"</span>) { <span class="tok-com">/* ... */</span> }
+dirs.forEach(move);</code></pre>
+    <p>应填入的<strong>关键字</strong>(3 个字符前后)是?</p>
+    <div class="type-check" data-widget="type-check"
+         data-answers="as const|as&nbsp;const"
+         data-ok="对!as const 会把数组凝固成只读元组,元素都是字面量类型,自然能赋给联合类型参数。"
+         data-bad="提示:三个字符、能把宽类型收窄为字面量、并把数组变只读——见 0002。">
+      <input placeholder="关键字…" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 6 ============ -->
+  <h2>6 · 枚举 enum:给一组命名常量一个"容器"</h2>
+  <div class="card">
+    <p>当你需要"<strong>几个互斥的具名值</strong>"(状态、方向、颜色代号),<code>enum</code> 是一种历史悠久、声明式的写法。</p>
+
+    <h3>6.1 数字枚举(有"反向映射")</h3>
+    <pre><code><span class="tok-key">enum</span> <span class="tok-type">Direction</span> {
+  Up,      <span class="tok-com">// 0</span>
+  Down,    <span class="tok-com">// 1</span>
+  Left,    <span class="tok-com">// 2</span>
+  Right,   <span class="tok-com">// 3</span>
+}
+<span class="tok-key">let</span> d: <span class="tok-type">Direction</span> = <span class="tok-type">Direction</span>.Left;  <span class="tok-com">// 2</span></code></pre>
+    <p>数字枚举有一个<strong>特殊性质</strong>——<strong>反向映射</strong>:从值也能查到名字。</p>
+    <pre><code><span class="tok-type">Direction</span>[2];        <span class="tok-com">// "Left"  ← 编译产物里是对象 {Up:0, Down:1, ...} 加反向映射</span>
+<span class="tok-type">Direction</span>[<span class="tok-str">"Left"</span>];  <span class="tok-com">// ❌ 字符串枚举才能这么做</span></code></pre>
+
+    <h3>6.2 字符串枚举(更直观,无反向映射)</h3>
+    <pre><code><span class="tok-key">enum</span> <span class="tok-type">Color</span> {
+  Red   = <span class="tok-str">"RED"</span>,
+  Green = <span class="tok-str">"GREEN"</span>,
+  Blue  = <span class="tok-str">"BLUE"</span>,
+}
+<span class="tok-key">let</span> c: <span class="tok-type">Color</span> = <span class="tok-type">Color</span>.Red;  <span class="tok-com">// "RED"</span></code></pre>
+    <p>字符串枚举的每一项<strong>必须显式赋值</strong>,运行时不创建反向映射,调试时看到的值更友好。</p>
+
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/enums.html">Handbook · Enums</a>。</p>
+  </div>
+
+  <!-- ============ 7 ============ -->
+  <h2>7 · 重点对比:enum vs 字面量联合</h2>
+  <div class="card">
+    <p>在现代 TypeScript 里,<strong>多数情况下推荐用字面量联合</strong>替代 <code>enum</code>。下面两种写法在<strong>类型能力上几乎一样</strong>:</p>
+    <pre><code><span class="tok-com">// —— 写法 A:enum ——</span>
+<span class="tok-key">enum</span> <span class="tok-type">Dir</span> { Up = <span class="tok-str">"UP"</span>, Down = <span class="tok-str">"DOWN"</span>, Left = <span class="tok-str">"LEFT"</span>, Right = <span class="tok-str">"RIGHT"</span> }
+
+<span class="tok-com">// —— 写法 B:字面量联合 + 类型别名(更轻) ——</span>
+<span class="tok-key">type</span> <span class="tok-type">Dir</span> = <span class="tok-str">"UP"</span> | <span class="tok-str">"DOWN"</span> | <span class="tok-str">"LEFT"</span> | <span class="tok-str">"RIGHT"</span>;
+
+<span class="tok-key">function</span> turn(d: <span class="tok-type">Dir</span>) { <span class="tok-com">/* ... */</span> }
+turn(<span class="tok-str">"UP"</span>);  <span class="tok-com">// ✅ 两种写法都接受</span></code></pre>
+
+    <h3>关键区别在"运行时"</h3>
+    <table>
+      <tr><th>维度</th><th><code>enum</code></th><th>字面量联合 <code>"A"|"B"</code></th></tr>
+      <tr><td>运行时代码</td><td>会生成一个真实的 JS 对象</td><td><strong>完全擦除</strong>,0 字节</td></tr>
+      <tr><td>值的使用</td><td><code>Dir.Up</code>(限定访问)</td><td>直接写字面量 <code>"UP"</code></td></tr>
+      <tr><td>反向映射</td><td>数字枚举有,字符串枚举无</td><td>无</td></tr>
+      <tr><td>tree-shaking</td><td>对象整体保留,通常更难摇掉</td><td>天然友好</td></tr>
+      <tr><td>类型能力</td><td>强(可做 namespace、常量等)</td><td>强(完全够用)</td></tr>
+    </table>
+
+    <p class="tip">选型建议(经验法则):<br>
+      • 仅在<strong>类型层</strong>用的有限集合 → 优先 <strong>字面量联合</strong>;<br>
+      • 需要<strong>运行时枚举对象</strong>(例如遍历、反射)、或希望"访问时带命名空间" → 用 <strong><code>enum</code></strong>;<br>
+      • 想要"既像 enum 又要 tree-shaking 友好" → <code>as const</code> 对象 + <code>typeof X[keyof typeof X]</code>(见下)。</p>
+  </div>
+
+  <div class="card">
+    <h3>折中写法:<code>as const</code> 对象</h3>
+    <pre><code><span class="tok-key">const</span> <span class="tok-type">Dir</span> = {
+  Up:    <span class="tok-str">"UP"</span>,
+  Down:  <span class="tok-str">"DOWN"</span>,
+  Left:  <span class="tok-str">"LEFT"</span>,
+  Right: <span class="tok-str">"RIGHT"</span>,
+} <span class="tok-key">as const</span>;
+
+<span class="tok-key">type</span> <span class="tok-type">Dir</span> = <span class="tok-key">typeof</span> <span class="tok-type">Dir</span>[<span class="tok-key">keyof</span> <span class="tok-key">typeof</span> <span class="tok-type">Dir</span>];  <span class="tok-com">// "UP"|"DOWN"|"LEFT"|"RIGHT"</span>
+
+<span class="tok-key">function</span> turn(d: <span class="tok-type">Dir</span>) { <span class="tok-com">/* ... */</span> }
+turn(<span class="tok-type">Dir</span>.Up);   <span class="tok-com">// ✅ 命名访问</span>
+turn(<span class="tok-str">"UP"</span>);     <span class="tok-com">// ✅ 也接受字面量</span></code></pre>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ①:enum 生成运行时代码(违反 0001 讲的"type erasure")</h3>
+    <p>回想 0001:<strong>类型在编译时被擦除</strong>。enum 是个例外——它会<strong>生成一个真实的对象</strong>,出现在 JS 产物里。生产环境<strong>建议开启 <code>"isolatedModules": true</code> + <code>"verbatimModuleSyntax"</code></strong>,并谨慎评估是否真的需要它。</p>
+    <pre><code><span class="tok-com">// TS 源码</span>
+<span class="tok-key">enum</span> <span class="tok-type">E</span> { A, B }
+console.log(<span class="tok-type">E</span>.A);
+
+<span class="tok-com">// 编译后 JS(简化)</span>
+<span class="tok-key">var</span> E;
+(<span class="tok-key">function</span> (E) {
+    E[E[<span class="tok-str">"A"</span>] = 0] = <span class="tok-str">"A"</span>;  <span class="tok-com">// 数字枚举的反向映射</span>
+    E[E[<span class="tok-str">"B"</span>] = 1] = <span class="tok-str">"B"</span>;
+})(E || (E = {}));
+console.log(E.A);</code></pre>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ②:数字枚举的"隐式值"会让人误解</h3>
+    <p>数字枚举<strong>默认从 0 自增</strong>。插入新成员或重排顺序会<strong>改值</strong>,而使用方拿到的是数字而不是名字——序列化、网络传输里会出人命。</p>
+    <pre><code><span class="tok-key">enum</span> <span class="tok-type">Status</span> { Pending, Running, Done }
+<span class="tok-type">JSON</span>.stringify({ s: <span class="tok-type">Status</span>.Running });  <span class="tok-com">// {"s":1} —— 你以为存的是 "Running" 吗?</span></code></pre>
+    <p><strong>经验</strong>:在需要序列化/跨网络/跨语言传递时,优先用<strong>字符串枚举</strong>或<strong>字面量联合</strong>,别用数字枚举。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="c"
+       data-ok="正确!字面量联合在编译后被完全擦除(0 字节运行时代码),类型能力与 enum 几乎等价,通常更推荐。"
+       data-bad="回看 §7 表格:哪种写法'运行时代码 0 字节'且'类型能力够用'?">
+    <div class="q">Q2:在现代 TypeScript 里,仅在"类型层"表达"有限几个值",以下哪种写法<strong>更轻</strong>?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">数字 enum(默认从 0 自增)</button>
+      <button class="quiz-option" data-value="b">字符串 enum</button>
+      <button class="quiz-option" data-value="c">字面量联合 type T = "A"|"B"|"C"</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 8 ============ -->
+  <h2>8 · 动手 B:用字面量联合改写一段 enum</h2>
+  <div class="card">
+    <p>原代码用了 enum 来表示"日志级别"。请把 enum 改写为<strong>字面量联合</strong>,让 <code>log()</code> 函数的参数类型保持相同的精确度。</p>
+    <pre><code><span class="tok-com">// 原版(enum)</span>
+<span class="tok-key">enum</span> <span class="tok-type">Level</span> { Info, Warn, Error }
+<span class="tok-key">function</span> log(level: <span class="tok-type">Level</span>, msg: <span class="tok-type">string</span>) { <span class="tok-com">/* ... */</span> }
+log(<span class="tok-type">Level</span>.Warn, <span class="tok-str">"hi"</span>);
+
+<span class="tok-com">// 改写后:Level 应为 ____ 联合类型</span>
+<span class="tok-key">type</span> <span class="tok-type">Level</span> = <span class="tok-com">/* ? */</span>;
+<span class="tok-key">function</span> log(level: <span class="tok-type">Level</span>, msg: <span class="tok-type">string</span>) { <span class="tok-com">/* ... */</span> }
+log(<span class="tok-str">"Warn"</span>, <span class="tok-str">"hi"</span>);  <span class="tok-com">// 期望编译通过</span></code></pre>
+    <p>应填入的<strong>三个字符串字面量</strong>(用 <code>|</code> 连接,大写首字母)是什么?</p>
+    <div class="type-check" data-widget="type-check"
+         data-answers="&quot;Info&quot;|&quot;Warn&quot;|&quot;Error&quot;|Info|Warn|Error|&quot;Info&quot; | &quot;Warn&quot; | &quot;Error&quot;"
+         data-ok="对!用 Info | Warn | Error 这种字面量联合替换 enum,类型能力不变,运行时代码为 0。"
+         data-bad="提示:把 enum Level 的三个成员名作为字符串字面量,用 | 连接。">
+      <input placeholder='例:"A" | "B" | "C"' /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 9 ============ -->
+  <h2>9 · 小结与下一步</h2>
+  <div class="card">
+    <ul class="checklist">
+      <li>✅ 数组:<code>T[]</code> 与 <code>Array&lt;T&gt;</code> 等价;<code>readonly T[]</code> / <code>ReadonlyArray&lt;T&gt;</code> 只读。</li>
+      <li>✅ 元组:固定长度、位置类型;可选元素 <code>?</code>、具名元素、rest 元素 <code>...T[]</code>。</li>
+      <li>✅ <code>as const</code>:把数组"凝固"成只读字面量元组,接 0002。</li>
+      <li>✅ 枚举:数字枚举有反向映射、字符串枚举更直观;现代 TS 常<strong>优先字面量联合</strong>或 <code>as const</code> 对象。</li>
+      <li>✅ 常见坑:enum 会生成运行时对象(违反 type erasure);数字枚举默认值的"重排灾难"。</li>
+      <li>📖 权威阅读:<a href="https://www.typescriptlang.org/docs/handbook/2/everyday-types.html#arrays">Handbook · Arrays</a> · <a href="https://www.typescriptlang.org/docs/handbook/2/objects.html#tuple-types">Handbook · Tuple Types</a> · <a href="https://www.typescriptlang.org/docs/handbook/enums.html">Handbook · Enums</a>。</li>
+      <li>🛠 动手:打开 <a href="https://www.typescriptlang.org/play">Playground</a>,把本课每段代码敲一遍;尝试用 <code>readonly</code>、<code>as const</code> 改造一段你正在写的代码。</li>
+      <li>➡️ <a href="0006-functions.html">下一课 0006</a>:函数——参数类型、返回值、void/never、可选参数、函数重载。</li>
+    </ul>
+    <p class="tip"><strong>卡住就问我</strong>——我是你的老师,可就任意一点展开、换讲法、加练习。</p>
+  </div>
+
+  <div class="footer">
+    TypeScript 课程 · 阶段一 · 0005 ·
+    <a href="index.html">阶段目录</a> · <a href="../reference/everyday-types-cheatsheet.html">速查表</a> · <a href="../RESOURCES.md">资源</a>
+  </div>
+
+  <script src="../assets/interactions.js"></script>
+</div>
+</body>
+</html>

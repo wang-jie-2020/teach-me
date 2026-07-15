@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>0006 · 函数类型深入</title>
+<link rel="stylesheet" href="../assets/style.css" />
+<link rel="stylesheet" href="../assets/interactions.css" />
+</head>
+<body>
+<div class="container">
+  <nav class="lesson-nav">
+    <span class="badge ts">阶段一 · LESSON 0006</span>
+    <a href="index.html">📚 阶段目录</a>
+    <a href="../reference/everyday-types-cheatsheet.html">📄 速查表</a>
+    <a href="0005-arrays-tuples-enums.html">← 上一课</a>
+    <a href="0007-special-types-and-assertions.html">下一课 →</a>
+  </nav>
+
+  <h1>函数类型深入</h1>
+  <p class="lead">本课小胜利:能用"函数类型表达式 (a: T) =&gt; U"描述一段行为,会用 <code>type</code> 给函数类型起名,理解<strong>可选参数 / 默认参数 / 剩余参数</strong>的差异,看懂 <code>void</code> 返回值的特殊含义,会用<strong>调用签名</strong>和<strong>函数重载</strong>表达"可调用 + 多种调用方式"。约 24 分钟。</p>
+
+  <!-- ============ 1 ============ -->
+  <h2>1 · 函数类型表达式:把"行为"也写成类型</h2>
+  <div class="card">
+    <p>在 0001 你已经会写"参数 + 返回值"的注解了。TypeScript 还允许<strong>把"一个函数本身"作为类型</strong>,语法是<strong>箭头函数形状</strong>(叫 <em>function type expression</em>):</p>
+    <pre><code><span class="tok-com">// 形如: (参数列表) =&gt; 返回值</span>
+<span class="tok-key">type</span> <span class="tok-type">Greet</span> = (<span class="tok-prop">name</span>: <span class="tok-type">string</span>) =&gt; <span class="tok-type">string</span>;
+
+<span class="tok-key">const</span> sayHi: <span class="tok-type">Greet</span> = (n) =&gt; <span class="tok-str">`Hi, ${n}`</span>;
+<span class="tok-key">const</span> sayHello: <span class="tok-type">Greet</span> = (n) =&gt; <span class="tok-str">`Hello, ${n}`</span>;</code></pre>
+    <p>它和<strong>函数声明</strong>的写法是镜像关系,只是少了函数名、参数名也可以省(类型由类型表达式锁定):</p>
+    <pre><code><span class="tok-com">// 写法 A:函数声明</span>
+<span class="tok-key">function</span> add(a: <span class="tok-type">number</span>, b: <span class="tok-type">number</span>): <span class="tok-type">number</span> { <span class="tok-key">return</span> a + b; }
+
+<span class="tok-com">// 写法 B:函数类型表达式 + 赋值</span>
+<span class="tok-key">type</span> <span class="tok-type">Add</span> = (a: <span class="tok-type">number</span>, b: <span class="tok-type">number</span>) =&gt; <span class="tok-type">number</span>;
+<span class="tok-key">const</span> add: <span class="tok-type">Add</span> = (a, b) =&gt; a + b;</code></pre>
+    <p>这种"行为即类型"的能力是函数式编程风格的支柱——它让你能把"如何执行"延后到赋值时决定,变量只承诺"我接什么、吐什么"。</p>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/functions.html#function-type-expressions">Handbook · More on Functions · Function Type Expressions</a>。</p>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ①:<code>(string) =&gt; void</code> 不是"接 string 返回 void"</h3>
+    <p>初学者最常踩的坑之一——这个写法看起来像"接 string 返回 void",但其实<strong>完全不是</strong>。看下面:</p>
+    <pre><code><span class="tok-com">// 看起来像: (string) =&gt; void</span>
+<span class="tok-key">function</span> log(msg) { console.log(msg); }
+
+<span class="tok-com">// 真正的含义是:</span>
+<span class="tok-com">//   参数名 叫 "string",类型是隐式 any</span>
+<span class="tok-com">//   返回值类型也是隐式 any</span>
+<span class="tok-com">// ↓ 正确写法 ↓</span>
+<span class="tok-key">function</span> log(msg: <span class="tok-type">string</span>): <span class="tok-type">void</span> { console.log(msg); }
+
+<span class="tok-com">// 作为类型表达式 ↓</span>
+<span class="tok-key">type</span> <span class="tok-type">Log</span> = (<span class="tok-prop">msg</span>: <span class="tok-type">string</span>) =&gt; <span class="tok-type">void</span>;</code></pre>
+    <p><strong>记忆口诀</strong>:<strong>参数一定要写 <code>name: type</code> 两个东西</strong>,少一个就翻车。</p>
+  </div>
+
+  <!-- ============ 2 ============ -->
+  <h2>2 · 给函数类型起名:<code>type</code> 复用 + 跨文件共享</h2>
+  <div class="card">
+    <p>把函数类型提取成别名,好处有三:</p>
+    <ol>
+      <li><strong>复用</strong>:同一份签名在多处使用,改一处全跟着改;</li>
+      <li><strong>可读性</strong>:<code>Parser</code> 比 <code>(input: string) =&gt; AST</code> 更易沟通;</li>
+      <li><strong>可导出</strong>:<code>export type</code> 让别的文件 <code>import</code> 进来用。</li>
+    </ol>
+    <pre><code><span class="tok-com">// —— types.ts ——</span>
+<span class="tok-key">export type</span> <span class="tok-type">CompareFn</span> = (a: <span class="tok-type">number</span>, b: <span class="tok-type">number</span>) =&gt; <span class="tok-type">number</span>;
+
+<span class="tok-com">// —— sort.ts ——</span>
+<span class="tok-key">import type</span> { <span class="tok-type">CompareFn</span> } <span class="tok-key">from</span> <span class="tok-str">"./types"</span>;
+
+<span class="tok-key">function</span> sort(arr: <span class="tok-type">number</span>[], cmp: <span class="tok-type">CompareFn</span>): <span class="tok-type">number</span>[] {
+  <span class="tok-key">return</span> [...arr].sort(cmp);
+}</code></pre>
+    <p>注意:用 <code>import type</code> 引入的别名<strong>编译后会被擦除</strong>(0001 的 type erasure 同样适用),不会生成额外的运行时代码。</p>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/functions.html">Handbook · More on Functions</a>。</p>
+  </div>
+
+  <!-- ============ 3 ============ -->
+  <h2>3 · 参数的三大形态:必选 / 可选 / 默认 / rest</h2>
+  <div class="card">
+    <h3>3.1 可选参数 <code>?</code></h3>
+    <p>在参数名后加 <code>?</code> 表示调用时<strong>可以省略</strong>。省略后该参数的值是 <code>undefined</code>——所以函数体内要把它当 <code>T | undefined</code> 处理。</p>
+    <pre><code><span class="tok-key">function</span> greet(name: <span class="tok-type">string</span>, prefix?: <span class="tok-type">string</span>): <span class="tok-type">string</span> {
+  <span class="tok-key">return</span> prefix ? <span class="tok-str">`${prefix} ${name}`</span> : name;
+}
+greet(<span class="tok-str">"Ada"</span>);              <span class="tok-com">// ✅ prefix 是 undefined</span>
+greet(<span class="tok-str">"Ada"</span>, <span class="tok-str">"Dr."</span>);       <span class="tok-com">// ✅ 传了就用</span>
+greet(<span class="tok-str">"Ada"</span>, <span class="tok-key">undefined</span>); <span class="tok-com">// ✅ 等同于省略</span></code></pre>
+    <p><strong>规则</strong>:可选参数<strong>必须</strong>在必选参数之后(否则位置对不上)。</p>
+  </div>
+
+  <div class="card">
+    <h3>3.2 默认参数</h3>
+    <p>用 <code>= 默认值</code> 既能省事,又锁定了缺省行为:</p>
+    <pre><code><span class="tok-key">function</span> greet(name: <span class="tok-type">string</span>, prefix: <span class="tok-type">string</span> = <span class="tok-str">"Hi"</span>): <span class="tok-type">string</span> {
+  <span class="tok-key">return</span> <span class="tok-str">`${prefix} ${name}`</span>;
+}
+greet(<span class="tok-str">"Ada"</span>);        <span class="tok-com">// "Hi Ada"</span>
+greet(<span class="tok-str">"Ada"</span>, <span class="tok-str">"Yo"</span>);  <span class="tok-com">// "Yo Ada"</span></code></pre>
+    <p>默认参数的位置<strong>不受限制</strong>(JS 早就有这个特性),但出于可读性通常还是放后面。</p>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ②:可选参数 ≠ 一定带默认值</h3>
+    <p>看起来"给个默认值更香",但两者在类型层含义不同:</p>
+    <pre><code><span class="tok-key">function</span> a(x?: <span class="tok-type">number</span>) { <span class="tok-key">return</span> x; }      <span class="tok-com">// 内部 x: number | undefined</span>
+<span class="tok-key">function</span> b(x: <span class="tok-type">number</span> = 0) { <span class="tok-key">return</span> x; }      <span class="tok-com">// 内部 x: number(默认已注入)</span></code></pre>
+    <p><strong>不能同时写</strong> <code>x?: number = 0</code>(语法错误,tsc 直接报错)。</p>
+    <p><strong>经验</strong>:</p>
+    <ul>
+      <li>想让"不传就走默认值,函数体内不用判空" → 用 <code>默认参数</code>;</li>
+      <li>想让"不传就显式 undefined,调用方必须面对这个事实" → 用 <code>可选参数</code>。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>3.3 剩余参数 <code>...args: T[]</code></h3>
+    <p>当参数数量不固定时,把"剩下的"放进数组。注意<strong>类型是数组 <code>T[]</code></strong>,调用时你可以传任意数量(包括 0 个):</p>
+    <pre><code><span class="tok-key">function</span> join(sep: <span class="tok-type">string</span>, ...parts: <span class="tok-type">string</span>[]): <span class="tok-type">string</span> {
+  <span class="tok-key">return</span> parts.join(sep);
+}
+join(<span class="tok-str">", "</span>);                  <span class="tok-com">// ""</span>
+join(<span class="tok-str">", "</span>, <span class="tok-str">"a"</span>);            <span class="tok-com">// "a"</span>
+join(<span class="tok-str">", "</span>, <span class="tok-str">"a"</span>, <span class="tok-str">"b"</span>, <span class="tok-str">"c"</span>);  <span class="tok-com">// "a, b, c"</span></code></pre>
+    <p><strong>规则</strong>:剩余参数<strong>必须</strong>是参数列表的<strong>最后一项</strong>,且<strong>只能有一个</strong>。在函数类型表达式里也支持:</p>
+    <pre><code><span class="tok-key">type</span> <span class="tok-type">Logger</span> = (<span class="tok-prop">prefix</span>: <span class="tok-type">string</span>, ...<span class="tok-prop">args</span>: <span class="tok-type">unknown</span>[]) =&gt; <span class="tok-type">void</span>;</code></pre>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/functions.html#rest-parameters-and-arguments">Handbook · More on Functions · Rest Parameters</a>。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="c"
+       data-ok="正确!剩余参数必须是参数列表的最后一项,且只能有一个——位置/数量都锁死了,放中间会让调用方搞不清哪几个属于'数组'。"
+       data-bad="回看 §3.3:rest 只能出现在哪?为什么?">
+    <div class="q">Q1:关于剩余参数 <code>...args: T[]</code>,以下说法<strong>正确</strong>的是?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">可以放在必选参数前面,只要之后是 T[] 就行</button>
+      <button class="quiz-option" data-value="b">一个函数可以写多个剩余参数,各自管一段</button>
+      <button class="quiz-option" data-value="c">必须放在参数列表最后,一个函数只能有一个</button>
+      <button class="quiz-option" data-value="d">剩余参数调用时至少要传 1 个,不能空</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 4 ============ -->
+  <h2>4 · 返回类型 <code>void</code> 的"特殊含义"</h2>
+  <div class="card">
+    <p>初学者的直觉:<code>void</code> = "这个函数啥也不返回"。更精确的说法是:<strong>函数的返回值会被忽略</strong>。
+      这带来一个非常特殊、也非常容易困惑的赋值兼容性——</p>
+    <pre><code><span class="tok-com">// 1) 一个真正"不返回"的函数</span>
+<span class="tok-key">function</span> noop(): <span class="tok-type">void</span> { <span class="tok-com">/* 没写 return */</span> }
+
+<span class="tok-com">// 2) 一个"返回 string"但调用方会忽略返回"的函数</span>
+<span class="tok-key">type</span> <span class="tok-type">VoidFn</span> = () =&gt; <span class="tok-type">void</span>;
+<span class="tok-key">const</span> f: <span class="tok-type">VoidFn</span> = () =&gt; <span class="tok-str">"I returned something"</span>;  <span class="tok-com">// ✅ 不报错!</span></code></pre>
+    <p>这是 TS <strong>有意为之</strong>的设计:<strong>当一个函数类型被声明为 <code>() =&gt; void</code> 时,任何"返回任何东西"的实现都能赋给它</strong>。
+      这解决了回调地狱里一个真实痛点:</p>
+    <pre><code><span class="tok-com">// 数组 forEach 的签名是 (cb: (item: T) =&gt; void) =&gt; void</span>
+<span class="tok-com">// 如果 void 严格要求"不能返回",下面这行就会报错:</span>
+[<span class="tok-str">"a"</span>, <span class="tok-str">"b"</span>].forEach(s =&gt; s.toUpperCase()); <span class="tok-com">// 箭头函数返回了 string</span>
+
+<span class="tok-com">// 实际行为:不报错,返回值被静默忽略,代码可读性反而更好。</span></code></pre>
+    <p><strong>关键结论</strong>:</p>
+    <ul>
+      <li><strong>实现侧</strong>:<code>() =&gt; void</code> 的实现可以返回任何值,调用方<strong>拿不到</strong>那个值;</li>
+      <li><strong>消费侧</strong>:<strong>反过来不成立</strong>——<code>() =&gt; string</code> 不能被 <code>() =&gt; void</code> 替换赋值,因为消费者依赖那个 string。</li>
+    </ul>
+    <p class="tip">这条规则在 <a href="https://www.typescriptlang.org/docs/handbook/2/functions.html#return-type-void">Handbook · Return type of void</a> 里有官方解释。</p>
+  </div>
+
+  <div class="card">
+    <h3>返回 union 类型:把"成功/失败"都写在签名里</h3>
+    <p>函数<strong>可以返回联合类型</strong>——这也是为什么 0005 的元组 <code>[number, string]</code> 在函数返回里特别常见:</p>
+    <pre><code><span class="tok-com">// "可能是数字,也可能是 null"</span>
+<span class="tok-key">function</span> findAge(name: <span class="tok-type">string</span>): <span class="tok-type">number</span> | <span class="tok-type">null</span> {
+  <span class="tok-key">return</span> name === <span class="tok-str">"Ada"</span> ? 36 : <span class="tok-key">null</span>;
+}
+
+<span class="tok-com">// "成功返回数据,失败返回错误信息"——元组版</span>
+<span class="tok-key">type</span> <span class="tok-type">Result</span> = [ok: <span class="tok-type">boolean</span>, data: <span class="tok-type">string</span>];
+<span class="tok-key">function</span> tryParse(s: <span class="tok-type">string</span>): <span class="tok-type">Result</span> {
+  <span class="tok-key">const</span> n = <span class="tok-type">Number</span>(s);
+  <span class="tok-key">return</span> [<span class="tok-type">Number</span>.isFinite(n), <span class="tok-type">String</span>(n)];
+}</code></pre>
+    <p>调用方在使用 union 返回值时,TS 会强制你"先收窄(0002 讲的类型守卫)再使用"——这就是把"可能出错"写进类型的能力。</p>
+  </div>
+
+  <!-- ============ 5 ============ -->
+  <h2>5 · 调用签名 call signature:对象又能调用</h2>
+  <div class="card">
+    <p>有些"东西"<strong>既是对象又有属性,同时还能像函数一样被调用</strong>——典型例子是 JS 里 <code>Date.now()</code> 不行、但 <code>Date()</code> 会得到一个字符串的旧 API,以及很多工具库返回的"可调用对象"。</p>
+    <p>TS 用<strong>调用签名</strong>表达这种"既可调用又有属性"的形态:</p>
+    <pre><code><span class="tok-com">// 写法: { 属性; (参数): 返回值 }</span>
+<span class="tok-key">type</span> <span class="tok-type">DescribableFn</span> = {
+  <span class="tok-prop">description</span>: <span class="tok-type">string</span>;
+  (<span class="tok-prop">arg</span>: <span class="tok-type">number</span>): <span class="tok-type">boolean</span>;
+};
+
+<span class="tok-key">function</span> doSomething(fn: <span class="tok-type">DescribableFn</span>) {
+  console.log(fn.description);  <span class="tok-com">// 访问属性</span>
+  console.log(fn(42));           <span class="tok-com">// 像函数一样调用</span>
+}</code></pre>
+    <p>和"函数类型表达式"对比着看:</p>
+    <pre><code><span class="tok-com">// 函数类型表达式:只能调用,没有"属性"位置</span>
+<span class="tok-key">type</span> <span class="tok-type">Fn1</span> = (x: <span class="tok-type">number</span>) =&gt; <span class="tok-type">boolean</span>;
+
+<span class="tok-com">// 调用签名:既能调用,也能挂属性</span>
+<span class="tok-key">type</span> <span class="tok-type">Fn2</span> = {
+  <span class="tok-prop">description</span>: <span class="tok-type">string</span>;
+  (<span class="tok-prop">x</span>: <span class="tok-type">number</span>): <span class="tok-type">boolean</span>;
+};</code></pre>
+    <p><strong>何时用</strong>:写框架(中间件、装饰器)、或给"既有属性又能调用"的第三方对象写类型时。<strong>普通业务函数优先用函数类型表达式</strong>,简单清楚。</p>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/functions.html#call-signatures">Handbook · Call Signatures</a>。</p>
+  </div>
+
+  <!-- ============ 6 ============ -->
+  <h2>6 · 函数重载 overloads:同一种行为,多种调用形态</h2>
+  <div class="card">
+    <p>有些函数对<strong>不同输入</strong>会给出<strong>不同输出</strong>——比如"传字符串就解析成日期,传时间戳数字就包装成 Date"。我们希望 TS 在调用点根据入参形状给出<strong>精确的返回类型</strong>。</p>
+    <p>这就是<strong>函数重载</strong>的舞台。它由<strong>多个重载签名 + 一个实现签名</strong>组成:</p>
+    <pre><code><span class="tok-com">// 重载签名(对外可见,会出现在 .d.ts / 悬浮提示里)</span>
+<span class="tok-key">function</span> makeDate(timestamp: <span class="tok-type">number</span>): <span class="tok-type">Date</span>;
+<span class="tok-key">function</span> makeDate(y: <span class="tok-type">number</span>, m: <span class="tok-type">number</span>, d: <span class="tok-type">number</span>): <span class="tok-type">Date</span>;
+
+<span class="tok-com">// 实现签名(对外不可见,只对实现代码可见;参数类型必须兼容所有重载)</span>
+<span class="tok-key">function</span> makeDate(yOrTs: <span class="tok-type">number</span>, m?: <span class="tok-type">number</span>, d?: <span class="tok-type">number</span>): <span class="tok-type">Date</span> {
+  <span class="tok-key">if</span> (m !== <span class="tok-key">undefined</span> &amp;&amp; d !== <span class="tok-key">undefined</span>) {
+    <span class="tok-key">return</span> <span class="tok-key">new</span> <span class="tok-type">Date</span>(yOrTs, m - 1, d);
+  }
+  <span class="tok-key">return</span> <span class="tok-key">new</span> <span class="tok-type">Date</span>(yOrTs);
+}
+
+makeDate(1234567890);                  <span class="tok-com">// ✅ 匹配第一个重载,返回 Date</span>
+makeDate(2026, 7, 15);                 <span class="tok-com">// ✅ 匹配第二个重载,返回 Date</span>
+makeDate(<span class="tok-str">"2026-07-15"</span>);              <span class="tok-com">// ❌ 任何重载都不匹配</span></code></pre>
+  </div>
+
+  <div class="card warn">
+    <h3>常见坑 ③:重载的实现签名对外不可见</h3>
+    <p>把鼠标悬停到 <code>makeDate</code> 上,你会看到 TS <strong>只暴露两个重载签名</strong>,实现签名里的 <code>m?: number, d?: number</code> 在调用方眼里不存在。
+      所以:</p>
+    <ul>
+      <li>调用方<strong>写不出</strong> <code>makeDate(2026, 7)</code> 这种"部分参数"调用(因为没有重载签名这么定义);</li>
+      <li>实现签名里的参数<strong>必须兼容所有重载</strong>(通常用 union 或最宽类型),否则 tsc 报错;</li>
+      <li>实现签名的<strong>返回类型</strong>必须能被所有重载签名的返回类型"赋值兼容",否则也报错。</li>
+    </ul>
+    <p><strong>经验</strong>:<strong>重载签名按"最具体 → 最宽"顺序写</strong>,TS 自上而下匹配。</p>
+  </div>
+
+  <div class="card">
+    <h3>何时用重载 vs union 参数</h3>
+    <p>不是所有"多种输入"都需要重载。判断标准:</p>
+    <table>
+      <tr><th>场景</th><th>推荐</th><th>原因</th></tr>
+      <tr><td>不同输入对应<strong>不同返回类型</strong></td><td><strong>重载</strong></td><td>调用方在调用点就能拿到精确类型</td></tr>
+      <tr><td>不同输入但<strong>返回类型一样</strong></td><td>union 参数</td><td>签名更短,无需维护多份</td></tr>
+      <tr><td>逻辑复杂、组合参数多</td><td><strong>重载</strong> + 实现签名</td><td>把"对外契约"与"实现"分开</td></tr>
+    </table>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/functions.html#overload-signatures-and-the-implementation-signature">Handbook · Overload Signatures and the Implementation Signature</a>。</p>
+  </div>
+
+  <div class="quiz" data-quiz="single-choice"
+       data-answer="b"
+       data-ok="正确!重载的实现签名不对外暴露——调用方看到的只是上面的多个重载签名,所以 '部分参数' 那种调用是写不出来的。"
+       data-bad="回看 §6 末段:重载的实现签名对调用方可见吗?它和重载签名有什么区别?">
+    <div class="q">Q2:对于 <code>function makeDate(y: number, m: number, d: number): Date</code> 这个重载函数,以下哪个调用<strong>会报错</strong>?</div>
+    <div class="quiz-grid">
+      <button class="quiz-option" data-value="a">makeDate(2026, 7, 15) — 三个参数都传</button>
+      <button class="quiz-option" data-value="b">makeDate(2026, 7) — 只传两个参数(期望 '部分参数也是合法的')</button>
+      <button class="quiz-option" data-value="c">makeDate(0) — 走单参数时间戳的重载</button>
+    </div>
+    <div class="quiz-feedback"></div>
+  </div>
+
+  <!-- ============ 7 ============ -->
+  <h2>7 · <code>this</code> 参数类型(简介)</h2>
+  <div class="card">
+    <p>JS 里 <code>this</code> 在<strong>普通函数</strong>中由"怎么调用"决定——常常踩坑。
+      TS 允许你在参数列表<strong>最前面</strong>显式声明 <code>this</code> 的类型,<strong>它不占位置</strong>、编译时也不出现在 JS 参数里:</p>
+    <pre><code><span class="tok-key">interface</span> <span class="tok-type">User</span> { <span class="tok-prop">name</span>: <span class="tok-type">string</span> }
+<span class="tok-key">function</span> intro(<span class="tok-key">this</span>: <span class="tok-type">User</span>) {
+  <span class="tok-key">return</span> <span class="tok-str">`I'm ${this.name}`</span>;
+}
+
+<span class="tok-key">const</span> u: <span class="tok-type">User</span> = { <span class="tok-prop">name</span>: <span class="tok-str">"Ada"</span>, <span class="tok-prop">intro</span>: intro };
+u.intro();             <span class="tok-com">// ✅ this 推断为 User</span>
+intro();               <span class="tok-com">// ❌ this 是 undefined(strictBindCallApply 下会报错)</span></code></pre>
+    <p><strong>何时用</strong>:写"会被当方法调用"的工具函数、类库、回调时,把 <code>this</code> 类型锁死,可以避免大量运行时 <code>Cannot read property 'x' of undefined</code>。</p>
+    <p class="tip">来源:<a href="https://www.typescriptlang.org/docs/handbook/2/functions.html#declaring-this-in-a-function">Handbook · Declaring <code>this</code> in a Function</a>。</p>
+  </div>
+
+  <!-- ============ 8 ============ -->
+  <h2>8 · 动手 A:写出正确的函数类型表达式</h2>
+  <div class="card">
+    <p>请把下面的需求翻译成<strong>函数类型表达式</strong>。函数接收一个字符串(用户名)和一个可选的字符串(问候前缀,默认 <code>"Hello"</code>),返回一段问候语。</p>
+    <p>用 <code>type Greet = (name: string, prefix?: string) =&gt; string;</code> 这样的语法写出<strong>完整一行</strong>:</p>
+    <div class="type-check" data-widget="type-check"
+         data-answers="type&nbsp;greet&nbsp;=&nbsp;(name:&nbsp;string,&nbsp;prefix?:&nbsp;string)&nbsp;=&gt;&nbsp;string;|type greet = (name: string, prefix?: string) =&gt; string;|type Greet = (name: string, prefix?: string) =&gt; string;"
+         data-ok="对!用 type 别名 + 箭头形式的函数类型表达式,可选参数加 ?。"
+         data-bad="提示:函数类型表达式语法是 (name: type, name?: type) =&gt; returnType; 用 type 别名包起来,可选参数用 ?。">
+      <input placeholder="type Greet = …" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 9 ============ -->
+  <h2>9 · 动手 B:修复重载签名</h2>
+  <div class="card">
+    <p>下面这段代码有一个语法 / 类型错误,导致"传 number 就返回 number、传 string 就返回 string"的契约失败。请填入正确的关键字 / 写法。</p>
+    <pre><code><span class="tok-com">// 目标:重载——传 number 返 number,传 string 返 string</span>
+<span class="tok-key">function</span> echo(n: <span class="tok-type">number</span>): <span class="tok-type">number</span>;
+<span class="tok-key">function</span> echo(s: <span class="tok-type">string</span>): <span class="tok-type">string</span>;
+<span class="tok-key">function</span> echo(v: <span class="tok-type">number</span> | <span class="tok-type">string</span>): <span class="tok-type">number</span> | <span class="tok-type">string</span> {
+  <span class="tok-key">return</span> v;
+}
+
+<span class="tok-key">const</span> a = echo(42);        <span class="tok-com">// a 应是 number</span>
+<span class="tok-key">const</span> b = echo(<span class="tok-str">"hi"</span>);  <span class="tok-com">// b 应是 string</span></code></pre>
+    <p>上面这段代码其实<strong>已经是对的</strong>。但你身边肯定见过这样的"假重载":</p>
+    <pre><code><span class="tok-com">// 错误写法:把"实现签名"当成了唯一签名,没有重载签名</span>
+<span class="tok-key">function</span> echo(v: <span class="tok-type">number</span> | <span class="tok-type">string</span>): <span class="tok-type">number</span> | <span class="tok-type">string</span> {
+  <span class="tok-key">return</span> v;
+}
+<span class="tok-key">const</span> a = echo(42);  <span class="tok-com">// a: number | string  ← 不再是 number</span></code></pre>
+    <p>要让 <code>echo(42)</code> 在调用点<strong>精确推断为 <code>number</code></strong>,<strong>必须</strong>用上面那种"多签名 + 实现签名"的形式。<strong>实现签名</strong>的英文叫什么?(小写,加 s)</p>
+    <div class="type-check" data-widget="type-check"
+         data-answers="implementation signature|implementation-signature|implementationsignature|implementation"
+         data-ok="对!implementation signature(实现签名)——它是重载函数里那个对外不可见、只对实现代码可见的签名。"
+         data-bad="提示:对外暴露的叫 overload signature(重载签名),另一个就叫 implementation signature。">
+      <input placeholder="英文术语" /><button class="btn">检查</button>
+      <div class="type-feedback"></div>
+    </div>
+  </div>
+
+  <!-- ============ 10 ============ -->
+  <h2>10 · 小结与下一步</h2>
+  <div class="card">
+    <ul class="checklist">
+      <li>✅ 函数类型表达式:<code>(a: T) =&gt; U</code>,可赋给变量、参数、返回值。</li>
+      <li>✅ 用 <code>type</code> 给函数类型起名,跨文件用 <code>export type</code> 共享。</li>
+      <li>✅ 参数四大形态:必选 / <code>?</code> 可选 / <code>= 默认值</code> 默认 / <code>...rest: T[]</code> 剩余。</li>
+      <li>✅ <code>void</code> 不只是"不返回",它的特殊赋值兼容性是为了让回调写起来更舒服。</li>
+      <li>✅ 调用签名:对象既能挂属性又能被调用,用 <code>{ (x): U; prop: T }</code> 表达。</li>
+      <li>✅ 函数重载:多签名(对外) + 一个实现签名(对内),实现签名不可见。</li>
+      <li>✅ <code>this</code> 参数类型:给"会被当方法调用"的函数上保险。</li>
+      <li>📖 权威阅读:<a href="https://www.typescriptlang.org/docs/handbook/2/functions.html">Handbook · More on Functions</a>(本课主要来源)。</li>
+      <li>🛠 动手:打开 <a href="https://www.typescriptlang.org/play">Playground</a>,把每段代码敲一遍,特别试试"重载 vs union 参数"那两段,对比 <code>echo(42)</code> 悬浮出的类型。</li>
+      <li>➡️ <a href="0007-special-types-and-assertions.html">下一课 0007</a>:特殊类型(<code>any / unknown / never / void</code>)与类型断言 / 收窄 / 类型守卫——把"值的可能性"精确表达出来。</li>
+    </ul>
+    <p class="tip"><strong>卡住就问我</strong>——我是你的老师,可就任意一点展开、换讲法、加练习。</p>
+  </div>
+
+  <div class="footer">
+    TypeScript 课程 · 阶段一 · 0006 ·
+    <a href="index.html">阶段目录</a> · <a href="../reference/everyday-types-cheatsheet.html">速查表</a> · <a href="../RESOURCES.md">资源</a>
+  </div>
+
+  <script src="../assets/interactions.js"></script>
+</div>
+</body>
+</html>

@@ -1,0 +1,54 @@
+/* 交互组件样式：可复用于后续所有 TS 课程 */
+.quiz {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 14px 0;
+  background: #0f1830;
+}
+.quiz .q { font-weight: 600; margin-bottom: 6px; }
+
+.quiz-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-top: 10px;
+}
+
+.quiz-option, .btn, .type-check button {
+  appearance: none;
+  border: 1px solid #3a4c7f;
+  background: #132042;
+  color: #e8ecf5;
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  text-align: left;
+}
+.quiz-option:hover, .btn:hover, .type-check button:hover {
+  border-color: #7cc4ff;
+  transform: translateY(-1px);
+}
+.quiz-option.correct { border-color: var(--accent-2); background: #16311f; }
+.quiz-option.wrong { border-color: var(--danger); background: #331a1a; }
+
+.quiz-feedback { margin-top: 8px; color: var(--muted); min-height: 1.2em; }
+.quiz-feedback.ok { color: var(--accent-2); }
+.quiz-feedback.bad { color: var(--danger); }
+
+/* 输入型练习：让学习者亲手敲出类型/答案 */
+.type-check { margin: 14px 0; }
+.type-check input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  background: #0e1630;
+  border: 1px solid #2a3864;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 220px;
+  margin-right: 8px;
+}
+.type-check .type-feedback { margin-top: 8px; color: var(--muted); min-height: 1.2em; }
+.type-check .type-feedback.ok { color: var(--accent-2); }
+.type-check .type-feedback.bad { color: var(--danger); }
